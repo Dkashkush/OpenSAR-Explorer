@@ -107,13 +107,16 @@ def _zones_table(r) -> str:
         f"<tr><td>{z.id}</td><td>{e(A.KINDS[z.kind])}</td><td>{z.area_ha:,.0f}</td><td>{z.lat:.4f}, {z.lon:.4f}</td>"
         f"<td>{e(z.when)}</td><td>{_num(z.hv_before_db)} → {_num(z.hv_after_db)}</td>"
         f"<td>{_num(z.agb_before, 0)}</td><td>{_num(z.co2_t, 0)}</td><td>{z.hansen_share:.0%}</td>"
-        f"<td>{'' if z.open_share is None else f'{z.open_share:.0%}'}</td></tr>"
+        f"<td>{'' if z.open_share is None else f'{z.open_share:.0%}'}</td>"
+        f"<td>{'high' if z.confirmed else 'check'}</td></tr>"
         for z in sorted(r.zones, key=lambda z: (z.kind != 'new', z.kind != 'unmapped', -z.area_ha))[:60])
     more = f"<p class='sub'>Showing 60 of {len(r.zones)} zones; all are in forest_loss_zones.csv.</p>" \
         if len(r.zones) > 60 else ""
     return ('<div class="scroll"><table><thead><tr><th>#</th><th>Type</th><th>Area (ha)</th><th>Lat, lon</th>'
             "<th>When</th><th>HV before → after (dB)</th><th>Biomass before (Mg/ha)</th><th>CO₂ (t)</th>"
-            f"<th>In Hansen</th><th>Open now</th></tr></thead><tbody>{rows}</tbody></table></div>{more}")
+            f"<th>In Hansen</th><th>Open now</th><th>Confidence</th></tr></thead><tbody>{rows}</tbody></table></div>"
+            f"{more}<p class='sub'>Confidence: new clearings are 'high' when seen on two or more later images; zones "
+            "lost since 2021 are 'high' when clearly below the open-land level, 'check' when borderline.</p>")
 
 
 def _references(r) -> str:

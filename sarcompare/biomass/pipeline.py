@@ -126,6 +126,7 @@ class ForestResult:
 
 
 ZONE_CODES = {"new": 1, "unmapped": 2, "hansen": 3}
+CLEAR_MARGIN_DB = 1.5  # 'lost since 2021' zones this far below the open-land level are labelled clearly open
 
 
 class ForestPipeline:
@@ -461,9 +462,11 @@ class ForestPipeline:
             if recent is not None:
                 unmapped &= recent < 0.3
             first = dates[0] if dates else None
+            # clearly open: well below the open-land level; just below it may be degraded forest or plantation
+            clear = r.hv_now_db <= r.stats.get("open_level_db", sep.threshold_db) - CLEAR_MARGIN_DB
             z, lab = A.zones_from(unmapped, "unmapped", lon, lat, grid.cell_ha, min_cells, len(zones) + 1,
                                   lambda sel: (f"after 2021, before {first}", None, first), None, r.hv_now_db,
-                                  agb_base, agb_now, recent, r.open_now)
+                                  agb_base, agb_now, recent, r.open_now, clear)
             zones += z
             zone_map[(lab > 0) & (zone_map == 0)] = ZONE_CODES["unmapped"]
 
@@ -502,11 +505,17 @@ class ForestPipeline:
             notes.append(Note("change", GOOD, f"No new clearing larger than {cfg.min_zone_ha:g} ha was detected between "
                                               f"{dates[0]} and {dates[-1]}."))
         if by["unmapped"]:
+            n = len(by["unmapped"])
+            clear = [z for z in by["unmapped"] if z.confirmed]
+            r.stats["unmapped_clear_ha"] = float(sum(z.area_ha for z in clear))
             notes.append(Note("change", WARN,
-                              f"{len(by['unmapped'])} zone{'s' if len(by['unmapped']) != 1 else ''}, {r.stats['unmapped_ha']:,.0f} ha, were forest in 2021 but "
+                              f"{n} zone{'s' if n != 1 else ''}, {r.stats['unmapped_ha']:,.0f} ha, were forest in 2021 but "
                               "look like open land to NISAR now, and are not (yet) in the Hansen loss maps: possibly "
-                              f"cleared in 2026 before {dates[0]}, or missed by Hansen. Check them on recent optical "
-                              "images before drawing conclusions."))
+                              f"cleared in 2026 before {dates[0]}, or missed by Hansen. {len(clear)} of them "
+                              f"({r.stats['unmapped_clear_ha']:,.0f} ha) are clearly open (HV at least "
+                              f"{CLEAR_MARGIN_DB:g} dB below the open-land level); the others are borderline and may be "
+                              "degraded forest or plantation. Check them on recent optical images before drawing "
+                              "conclusions."))
         if by["hansen"]:
             still = [z.open_share for z in by["hansen"] if z.open_share is not None]
             share = float(np.average(still, weights=[z.area_ha for z in by["hansen"] if z.open_share is not None])) \

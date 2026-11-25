@@ -120,7 +120,8 @@ def show_forest_results(r):
             st.dataframe([{"Zone": x["zone"], "Type": x["type"], "Area (ha)": x["area_ha"], "Latitude": x["latitude"],
                            "Longitude": x["longitude"], "When": x["when"],
                            "Biomass before (t/ha)": x["biomass_before_mg_ha"], "CO₂ (t)": x["co2_t"],
-                           "Open land now": None if x["open_now_share"] is None else f"{x['open_now_share']:.0%}"}
+                           "Open land now": None if x["open_now_share"] is None else f"{x['open_now_share']:.0%}",
+                           "Confidence": "high" if x["confirmed"] else "check"}
                           for x in rows], hide_index=True, width="stretch")
 
     st.markdown('<div class="section"><h2>More detail</h2></div>', unsafe_allow_html=True)

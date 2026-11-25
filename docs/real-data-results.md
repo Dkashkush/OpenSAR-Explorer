@@ -1,7 +1,8 @@
 # Real-data test results
 
 These are the results of running OpenSAR Explorer on real NISAR and Sentinel-1 products with the
-**Real-data test** workflow (`.github/workflows/real-data-test.yml`), in October 2026. Each run searches ASF,
+**Real-data test** workflow (`.github/workflows/real-data-test.yml`), in October 2026, and (Forests & Biomass, at
+below) on NISAR GCOV over four Indian forests in November 2026. Each run searches ASF,
 reads only the part of each file that covers the area (about 20 GB of products per run is never
 downloaded), compares the two satellites, and checks both against GNSS stations from the Nevada Geodetic
 Laboratory. GNSS rates are measured over each satellite's own dates.
@@ -154,6 +155,66 @@ dates. Both maps were tied to GNSS station MMX1 (−268 mm/yr over these dates).
   a large-scale tilt that a single GNSS station cannot remove.
 
 This confirms LiCSAR's sign and scale: sinking reads negative, at the rates GNSS and the papers report.
+
+## Forests & Biomass: four Indian forests (November 2026)
+
+Run with the **Forest test** workflow (`.github/workflows/forest-test.yml`): NISAR L2 GCOV images from June to
+November 2026 (12 per forest, one track and frame each, read remotely over the area only and averaged to 100 m),
+compared with ESA WorldCover 2021, Hansen et al. Global Forest Change v1.13 (loss up to 2025) and ESA CCI Biomass
+v7.0 (2024 for calibration, 2020 as the before-loss baseline). Biomass is above-ground, in Mg/ha (tonnes per
+hectare). Checks use 30 % of each area held out in 2 km blocks.
+
+| | Hasdeo Arand (Chhattisgarh) | Wayanad (Western Ghats) | Dehing Patkai (Assam) | Lunglei (Mizoram) |
+|---|---|---|---|---|
+| NISAR images | 12, track 149 D, Jun 24 – Nov 15 | 12, track 12 A, Jun 27 – Nov 18 | 12, track 62 D, Jun 18 – Nov 21 | 12, track 163 D, Jun 25 – Nov 16 |
+| Forest in 2021 | 59 % of the area | 91 % (100,087 ha) | 84 % (58,567 ha) | 98 % (101,947 ha) |
+| HV intact forest / mapped clearings | −10.1 / −16.7 dB | −10.4 / −12.4 dB | −10.2 / −12.1 dB | −10.9 / −11.3 dB |
+| Forest vs mapped clearings, held out | 98 % balanced accuracy | 87 % | 72 % | 61 % |
+| Biomass calibration | rejected (see below) | saturates ≈ 242, r = 0.61 | saturates ≈ 150, r = 0.85 | no saturation to 310, r = 0.37 |
+| Mean forest biomass, NISAR / ESA CCI | – / 24 | 133 / 131 | 102 (lower bound) / 140 | 152 / 152 |
+| New clearing, Jun–Nov 2026 | 1 zone, 2 ha (confirmed) | none | 1 zone, 3 ha (confirmed) | none |
+| Lost since 2021, not in Hansen | none | 5 zones, 10 ha | 173 zones, 803 ha | 163 zones, 561 ha |
+| Hansen loss 2021–2025 / still open | 407 ha in zones / 95 % | 1,684 ha / 8 % | 762 ha / 22 % | 7,726 ha / 0 % |
+
+**Hasdeo Arand.** The clearest case: the open-cast coal mines leave bare ground, 6.5 dB darker than the sal forest,
+so forest and cleared land separate almost perfectly. NISAR found one new 2 ha clearing at the eastern edge of the
+Parsa East Kete Basan mine (22.814 N, 82.833 E), dated between 22 October and 3 November 2026 and confirmed on the
+two later images, and sees 95 % of the 407 ha mapped by Hansen et al. (mostly the mine, 2021–2025) still open.
+Biomass is not estimated: ESA CCI gives only 24 Mg/ha on average over this forest, and a median of 37 Mg/ha where
+NISAR sees the densest canopy, so the two cannot be calibrated against each other. The first run fitted a
+saturation of 12 Mg/ha from this mismatch; the app now rejects such fits and says why.
+
+**Wayanad.** Biomass agrees closely with ESA CCI on average (133 vs 131 Mg/ha), and the radar keeps responding up to
+about 240 Mg/ha in these dense evergreen and moist deciduous forests. No new clearing in the period. Hansen's 1,684 ha
+of loss since 2021 is 92 % vegetated again (coffee, tea and eucalyptus plantations are harvested and regrow), only
+1.9 dB below intact forest.
+
+**Dehing Patkai.** The best biomass check of the four (held-out r = 0.85); 40 % of the forest is denser than the
+radar's saturation level (≈ 150 Mg/ha), so NISAR's mean is a lower bound there and below ESA CCI's 140. One new
+3 ha clearing (27.284 N, 95.737 E) between 4 and 16 October 2026, confirmed on later images. 803 ha were forest in
+2021 and look open now without being in the Hansen maps (HV −13.6 to −17 dB, field and clearing levels, not radar
+shadow); the area includes open-cast coal mining and tea gardens, and the borderline patches are labelled for
+checking.
+
+**Lunglei.** Shifting cultivation (jhum): plots are slashed in January–March and the fallows regrow within a year,
+so Hansen's 2021–2025 clearings are now only 0.4 dB below intact forest and none look open. NISAR finds no clearing
+between June and November (outside the cutting season) and 561 ha of forest that is open land in 2026 but not in
+the Hansen maps, consistent with this year's jhum plots, which Hansen's 2025 maps cannot include yet. Hansen maps
+1,000–1,700 ha of loss a year in this area.
+
+**What the first runs taught, and what changed.** The first round over these four forests (same data) exposed two
+problems, both fixed and covered by tests:
+
+1. *A noisy reference map faked an early saturation* (Hasdeo Arand: 12 Mg/ha). Fitting HV against biomass-binned
+   medians lets the reference map's errors flatten the curve; the curve is now fitted through medians binned both by
+   biomass and by HV (the non-linear analogue of the OLS bisector), and flat or degenerate fits are rejected.
+2. *Regrown clearings made forest look open* (Wayanad 1,463 ha, Dehing Patkai 6,529 ha, Lunglei 29,832 ha of
+   'lost since 2021'). Where mapped clearings have regrown, the forest/cleared level learned from them sits inside
+   the forest. Land now counts as open only where HV is also at least 3 dB below intact forest, the drop that
+   removing the trunks produces; the same level decides new clearing and the 'still open' share.
+
+ESA CCI Biomass is itself partly made from L-band radar, so the biomass checks are consistency checks, not fully
+independent validation; field plots (for example the Forest Survey of India inventory) are the real test.
 
 ## What changed in the app because of these tests
 
