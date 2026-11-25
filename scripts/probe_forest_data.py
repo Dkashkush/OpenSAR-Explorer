@@ -94,12 +94,13 @@ def main() -> int:
             if fmt in sub:
                 years = [x.strip("/") for x in links(f"{base}{v}/{fmt}/")]
                 print(f"    {fmt} years: {years}")
-                if years:
-                    y = sorted(years)[-1]
+                numeric = sorted(y for y in years if y.isdigit())
+                for y in numeric[-1:] + [y for y in years if not y.isdigit()][:1]:
                     files = links(f"{base}{v}/{fmt}/{y}/")
-                    print(f"    {y}: {len(files)} files, e.g. {files[:4]}")
-                    hits = [f for f in files if f.upper().startswith(f"N{top:02d}E{left:03d}")]
-                    print(f"    tile for the test area: {hits}")
+                    print(f"    {y}: {len(files)} files, e.g. {files[:6]}")
+                    tag = f"N{top:02d}E{left:03d}"
+                    hits = [f for f in files if tag in f.upper()]
+                    print(f"    files for tile {tag}: {hits}")
                     for f in hits[:2]:
                         url = f"{base}{v}/{fmt}/{y}/{f}"
                         print(f"    {f}: {head(url)}")
