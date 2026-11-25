@@ -35,8 +35,8 @@ on:
         options: [any, ASCENDING, DESCENDING]
         default: any
 
-concurrency:
-  group: forest-test
+concurrency:  # one queue per forest: runs for different forests go in parallel, never cancel each other
+  group: forest-test-${{ inputs.site }}
   cancel-in-progress: false
 
 jobs:
