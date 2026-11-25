@@ -89,13 +89,19 @@ def test_find_place_and_box_around():
         pass
 
 
+def _ground_motion_page():
+    from sarcompare.gui import page_explore
+
+    page_explore()
+
+
 def test_place_search_in_the_app(monkeypatch):
     from streamlit.testing.v1 import AppTest
     import sarcompare.maps as maps
 
     monkeypatch.setattr(maps, "find_place", lambda q, **kw: [
         {"name": "Venice, Italy", "lat": 45.4371, "lon": 12.3326, "bbox": (12.28, 45.38, 12.40, 45.48)}])
-    at = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"), default_timeout=60)
+    at = AppTest.from_function(_ground_motion_page, default_timeout=60)  # the app opens on Home; test the page
     at.run()
     next(r for r in at.radio if "Analyse a real place" in r.options).set_value("Analyse a real place").run()
     next(t for t in at.text_input if t.label == "Search a place").input("Venice").run()

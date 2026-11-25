@@ -18,7 +18,8 @@ What is allowed without asking:
 
 Not covered by this notice: satellite, GNSS and published data shown or processed by the software belong to
 their providers and are used under their own licences (see the data credits in each report). Third-party
-software packages installed alongside this software are covered by their own licences.
+software packages installed alongside this software are covered by their own licences, and the font files in
+static/fonts are third-party fonts under the SIL Open Font License 1.1 (see THIRD_PARTY_NOTICES.md).
 
 To ask for permission (for example to run your own copy, or for teaching or research use), contact the
 copyright holder through https://github.com/Dkashkush.

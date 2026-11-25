@@ -363,7 +363,7 @@ class ForestPipeline:
 
     # ------------------------------------------------------------------ biomass
     def biomass(self) -> None:
-        r, cfg = self.result, self.cfg
+        r = self.result
         cci = r.ref.get("cci")
         if cci is None or r.hv_all_db is None:
             return

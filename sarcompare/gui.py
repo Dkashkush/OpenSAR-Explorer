@@ -17,6 +17,7 @@ from sarcompare import __author__, __copyright__, code_version
 from sarcompare.config import Config
 from sarcompare.notes import GOOD, WARN
 from sarcompare.pipeline import Event, Pipeline
+from sarcompare.ui_style import CSS
 
 ICON = {GOOD: "✅", WARN: "⚠️"}
 STAGES = {"search": "Finding satellite data", "download": "Downloading", "load": "Reading the data",
@@ -48,25 +49,6 @@ MAX_PAIRS_ONLINE = int(_setting("SARCOMPARE_MAX_PAIRS", "8"))
 
 MODE_DEMO, MODE_REAL, MODE_LOCAL = "Try the demo", "Analyse a real place", "Use files I already have"
 
-CSS = """
-<style>
-.app-banner{background:linear-gradient(90deg,#0b2e4f 0%,#1f5f8b 100%);color:#fff;padding:18px 24px;
-  border-radius:10px;margin:0 0 6px}
-.app-banner h1{color:#fff;font-size:1.55rem;line-height:1.25;margin:0;padding:0}
-.app-banner p{margin:6px 0 0;color:#d6e4f0;font-size:.98rem}
-.app-banner .byline{font-size:.95rem;font-weight:500;color:#d6e4f0;margin-left:8px;white-space:nowrap}
-.app-banner .module{display:inline-block;background:rgba(255,255,255,.16);color:#fff;border:1px solid
-  rgba(255,255,255,.35);border-radius:999px;padding:1px 10px;margin-right:8px;font-size:.85rem;font-weight:600}
-.step{display:flex;align-items:center;gap:10px;font-size:1.18rem;font-weight:650;margin:26px 0 6px;color:#1f2933}
-.step .n{background:#1f5f8b;color:#fff;border-radius:50%;min-width:30px;height:30px;display:inline-flex;
-  align-items:center;justify-content:center;font-size:.95rem}
-.hint{color:#5b6670;font-size:.92rem;margin:-2px 0 8px}
-.badge{display:inline-block;background:#fff4d6;color:#7a5200;border:1px solid #f0d58a;border-radius:6px;
-  padding:2px 8px;font-size:.85rem;font-weight:600;vertical-align:middle}
-.app-footer{border-top:1px solid #d9dee3;margin-top:42px;padding-top:12px;color:#5b6670;font-size:.84rem}
-.app-footer a{color:#1f5f8b}
-</style>
-"""
 
 
 # ----------------------------------------------------------------------------------------------- helpers
@@ -100,35 +82,47 @@ def save_upload(f) -> str:
 
 
 MODULES = {
-    "Ground Motion": ("Ground Motion module", "See where the ground is sinking or rising, measured by two radar "
-                      "satellites (NISAR and Sentinel-1), side by side, explained in plain language."),
-    "Forests & Biomass": ("Forests & Biomass module", "Map how much wood a forest holds and find where it is being "
-                          "cleared, with NISAR's L-band radar that sees into the canopy, checked against independent "
-                          "forest maps."),
+    "Ground Motion": ("motion", "🛰️", "Module 1 · Ground Motion", "Is the ground sinking or rising?",
+                      "Two radar satellites, NISAR and Sentinel-1, measure millimetres of ground motion. See them "
+                      "side by side, checked against GNSS stations and published studies, in plain language."),
+    "Forests & Biomass": ("forest", "🌳", "Module 2 · Forests & Biomass", "How much wood, and where is it lost?",
+                          "NISAR's L-band radar sees into the canopy: map forest biomass and find where forest is "
+                          "being cleared, checked against ESA and Global Forest Change maps."),
+    "Learn": ("neutral", "📘", "Learn", "How satellite radar works",
+              "InSAR, backscatter, biomass and how to read every map in this app, in a few minutes."),
+    "Help & FAQ": ("neutral", "💬", "Help & FAQ", "Answers and first steps",
+                   "What to do when no data is found, accounts and tokens, run times, credits and responsible use."),
 }
 
 
 def header(page: str = "Ground Motion"):
-    chip, text = MODULES.get(page, ("", "Satellite radar for ground motion and forests, explained in plain "
-                                        "language."))
-    chip_html = f'<span class="module">{chip}</span> ' if chip else ""
-    st.markdown(
-        f'<div class="app-banner"><h1>🛰️ OpenSAR Explorer <span class="byline">created by {__author__}</span></h1>'
-        f"<p>{chip_html}{text}</p></div>", unsafe_allow_html=True)
+    """Module banner and page colours (the Home page draws its own hero)."""
+    from sarcompare.ui_style import accent_css, banner
+
+    if page not in MODULES:
+        st.markdown(accent_css("neutral"), unsafe_allow_html=True)
+        return
+    module, icon, kicker, title, text = MODULES[page]
+    st.markdown(accent_css(module) + banner(icon, kicker, title, text), unsafe_allow_html=True)
 
 
 def footer():
     st.markdown(
-        f'<div class="app-footer">OpenSAR Explorer {__copyright__} An independent tool, not affiliated with NASA, ISRO, ESA, ASF or USGS. '
-        "Data: NISAR (NASA/ISRO) and Copernicus Sentinel-1 (ESA) via the "
+        f'<div class="app-footer"><div><div class="brand">🛰️ OpenSAR Explorer</div>'
+        f"<p>{__copyright__} Created by {__author__}. An independent tool, not affiliated with NASA, ISRO, ESA, ASF "
+        "or USGS. Results are research estimates: verify before making decisions.</p>"
+        f"<p>Version {code_version()}</p></div>"
+        "<div><h5>Data</h5><p>NISAR (NASA/ISRO) and Copernicus Sentinel-1 (ESA) via the "
         '<a href="https://asf.alaska.edu" target="_blank">Alaska Satellite Facility</a>; GNSS from the '
         '<a href="https://geodesy.unr.edu" target="_blank">Nevada Geodetic Laboratory</a>; forest maps from ESA '
         "WorldCover and ESA CCI Biomass, and Hansen/UMD/Google/USGS/NASA (CC BY 4.0); base maps © "
-        "OpenStreetMap contributors and Esri. Results are research estimates: verify before making decisions. "
-        f"Version {code_version()}. "
-        f'<a href="{REPO}/blob/HEAD/TERMS.md" target="_blank">Terms of use</a> · '
-        f'<a href="{REPO}/blob/HEAD/PRIVACY.md" target="_blank">Privacy</a> · '
-        f'<a href="{REPO}/blob/HEAD/LICENSE" target="_blank">Licence</a></div>',
+        "OpenStreetMap contributors and Esri.</p></div>"
+        "<div><h5>About</h5><ul>"
+        f'<li><a href="{REPO}/blob/HEAD/TERMS.md" target="_blank">Terms of use</a></li>'
+        f'<li><a href="{REPO}/blob/HEAD/PRIVACY.md" target="_blank">Privacy</a></li>'
+        f'<li><a href="{REPO}/blob/HEAD/LICENSE" target="_blank">Licence</a></li>'
+        f'<li><a href="{REPO}/blob/HEAD/THIRD_PARTY_NOTICES.md" target="_blank">Data credits</a></li>'
+        "</ul></div></div>",
         unsafe_allow_html=True)
 
 
@@ -529,6 +523,30 @@ def offer_hyp3(res):
                 st.error(friendly_error(e))
 
 
+def results_title(synthetic: bool):
+    badge = ' <span class="badge">Synthetic demo data, not a real place</span>' if synthetic else ""
+    st.markdown(f'<div class="section"><h2>Results</h2>{badge}</div>', unsafe_allow_html=True)
+
+
+def show_map(html: str, height: int = 580):
+    if hasattr(st, "iframe"):  # st.components.v1.html is being removed from Streamlit
+        st.iframe(html, height=height)
+    else:
+        import streamlit.components.v1 as components
+        components.html(html, height=height)
+
+
+def download_grid(outputs: dict, prefix: str, per_row: int = 3):
+    """Download buttons for result files, laid out in rows of ``per_row``."""
+    files = [(k, Path(v)) for k, v in outputs.items() if Path(v).is_file()]
+    with st.container(key="downloads"):
+        for i in range(0, len(files), per_row):
+            cols = st.columns(per_row)
+            for col, (key, path) in zip(cols, files[i:i + per_row]):
+                col.download_button(f"⬇ {path.name}", path.read_bytes(), file_name=path.name,
+                                    key=f"{prefix}_{key}", width="stretch")
+
+
 def show_results(res):
     from sarcompare.interpret import plain_summary
     from sarcompare.maps import results_map
@@ -536,12 +554,8 @@ def show_results(res):
     c = res.comparison
     maps = res.rates  # one map when a satellite has no data for the area
     sensors = [rm.sensor for rm in maps]
-    st.markdown("---")
-    title = "## Results"
-    if res.config.extra.get("synthetic"):
-        title += ' <span class="badge">Synthetic demo data, not a real place</span>'
-    st.markdown(title, unsafe_allow_html=True)
-    with st.container(border=True):
+    results_title(bool(res.config.extra.get("synthetic")))
+    with st.container(border=True, key="in_short"):
         st.markdown("#### In short")
         for level, text in plain_summary(res):
             st.markdown(f"{ICON.get(level, 'ℹ️')} {text}")
@@ -564,16 +578,12 @@ def show_results(res):
         m[3].metric("Typical difference", f"{c.rmsd_mm_yr:.0f} mm/yr")
         m[4].metric("Moving areas found", len(c.hotspots))
 
-    st.markdown("#### Map")
-    st.caption("Switch layers with the box at the top right. Click markers for details. Red = sinking, "
-               "blue = rising, no colour = no reliable data.")
-    # Display-only map: plain embedded HTML is more robust than the two-way map component here.
-    html = results_map(res).get_root().render()  # built by the app; user text in it is escaped
-    if hasattr(st, "iframe"):  # st.components.v1.html is being removed from Streamlit
-        st.iframe(html, height=580)
-    else:
-        import streamlit.components.v1 as components
-        components.html(html, height=580)
+    with st.container(border=True, key="panel_gm_map"):
+        st.markdown("#### Map")
+        st.caption("Switch layers with the box at the top right. Click markers for details. Red = sinking, "
+                   "blue = rising, no colour = no reliable data.")
+        # Display-only map: plain embedded HTML is more robust than the two-way map component here.
+        show_map(results_map(res).get_root().render())  # built by the app; user text in it is escaped
     if c.hotspots:
         with st.expander(f"Moving areas ({len(c.hotspots)})", expanded=True):
             st.dataframe([{"Detected by": h.sensor, "Latitude": round(h.lat, 4), "Longitude": round(h.lon, 4),
@@ -582,7 +592,7 @@ def show_results(res):
                                                            "single": "Only one satellite here"}[h.seen_by_other]}
                           for h in c.hotspots], hide_index=True, width="stretch")
 
-    st.markdown("#### More detail")
+    st.markdown('<div class="section"><h2>More detail</h2></div>', unsafe_allow_html=True)
     tabs = st.tabs(["⬇️ Download", "Side by side", "Agreement", "Checks", "Data used", "All notes"])
     with tabs[1]:
         st.image(res.figures["rate_maps"]["light"], width="stretch")
@@ -658,70 +668,77 @@ def show_results(res):
             st.download_button("⬇️ Download the full report (HTML, opens in any browser)", rep.read_bytes(),
                                file_name=rep.name, type="primary", key="dl_report")
         st.markdown("**Map files for GIS software (QGIS, ArcGIS) and the numbers (JSON)**")
-        for key, path in res.outputs.items():
-            path = Path(path)
-            if key != "report" and path.is_file():
-                st.download_button(path.name, path.read_bytes(), file_name=path.name, key=f"dl_{key}")
+        download_grid({k: v for k, v in res.outputs.items() if k != "report"}, "dl")
 
 
 def page_explore():
-    step(1, "What would you like to do?")
-    modes = [MODE_DEMO, MODE_REAL] + ([] if ONLINE else [MODE_LOCAL])
-    captions = ["No account needed. Uses made-up data to show how everything works.",
-                "Downloads real NISAR and Sentinel-1 data for any place (free NASA account).",
-                "Analyse NISAR and Sentinel-1 files you already downloaded."][:len(modes)]
-    mode = st.radio("Mode", modes, captions=captions, horizontal=True, label_visibility="collapsed")
+    with st.container(border=True, key="step_gm_mode"):
+        step(1, "What would you like to do?")
+        modes = [MODE_DEMO, MODE_REAL] + ([] if ONLINE else [MODE_LOCAL])
+        captions = ["No account needed. Uses made-up data to show how everything works.",
+                    "Downloads real NISAR and Sentinel-1 data for any place (free NASA account).",
+                    "Analyse NISAR and Sentinel-1 files you already downloaded."][:len(modes)]
+        mode = st.radio("Mode", modes, captions=captions, horizontal=True, label_visibility="collapsed")
+        if mode == MODE_DEMO:
+            st.info("**Demo:** a made-up 30 × 28 km scene with a sinking city and a landslide under forest, written "
+                    "in the real NISAR and Sentinel-1 file formats. Just press **Run analysis** below.")
 
     bbox, period, token, local_dirs = None, (None, None), None, (None, None)
     if mode == MODE_DEMO:
-        st.info("**Demo:** a made-up 30 × 28 km scene with a sinking city and a landslide under forest, written in "
-                "the real NISAR and Sentinel-1 file formats. Just press **Run analysis** below.")
-        checks = choose_checks(2)
+        with st.container(border=True, key="step_gm_checks"):
+            checks = choose_checks(2)
         n_next = 3
     else:
-        bbox = choose_area()
-        period = choose_period()
-        checks = choose_checks(4)
-        if mode == MODE_REAL:
-            token = token_step(5)
-        else:
-            step(5, "Where are your files?")
-            c1, c2 = st.columns(2)
-            local_dirs = (c1.text_input("Folder with NISAR GUNW .h5 files", "data/NISAR"),
-                          c2.text_input("Folder with Sentinel-1 files (ARIA .nc, OPERA .nc, HyP3 .zip)",
-                                        "data/Sentinel-1"))
+        with st.container(border=True, key="step_gm_area"):
+            bbox = choose_area()
+        with st.container(border=True, key="step_gm_period"):
+            period = choose_period()
+        with st.container(border=True, key="step_gm_checks"):
+            checks = choose_checks(4)
+        with st.container(border=True, key="step_gm_access"):
+            if mode == MODE_REAL:
+                token = token_step(5)
+            else:
+                step(5, "Where are your files?")
+                c1, c2 = st.columns(2)
+                local_dirs = (c1.text_input("Folder with NISAR GUNW .h5 files", "data/NISAR"),
+                              c2.text_input("Folder with Sentinel-1 files (ARIA .nc, OPERA .nc, HyP3 .zip)",
+                                            "data/Sentinel-1"))
         n_next = 6
     adv = advanced_settings()
 
-    step(n_next, "Run")
-    b1, b2, _ = st.columns([1, 1, 2])
-    run = b1.button("▶ Run analysis", type="primary", width="stretch")
-    check = b2.button("Check available data", width="stretch", disabled=mode != MODE_REAL,
-                      help="Search only, without downloading, to see what exists for your area and dates.")
-    if run or check:
-        problem = None
-        if mode != MODE_DEMO and not bbox:
-            problem = "Please choose an area first (step 2)."
-        elif mode == MODE_REAL and ONLINE and not token:
-            problem = "Please paste your free NASA Earthdata token (step 5)."
-        elif mode != MODE_DEMO and period[0] and period[1] and period[0] >= period[1]:
-            problem = "The start date must be before the end date."
-        if problem:
-            st.warning(problem)
-        else:
-            try:
-                cfg = build_config(mode, bbox, period, checks, token, adv, local_dirs)
-                if ONLINE and mode != MODE_DEMO and cfg.get_aoi().area_km2() > MAX_AOI_KM2:
-                    raise ValueError(f"The online version handles areas up to {MAX_AOI_KM2:,.0f} km². "
-                                     "Draw a smaller box, or run the app on your own computer.")
-            except ValueError as e:
-                st.warning(str(e))
+    run_card = st.container(border=True, key="step_gm_run")
+    with run_card:
+        step(n_next, "Run", "A demo takes under a minute; real data a few minutes.")
+        b1, b2, _ = st.columns([1, 1, 2])
+        run = b1.button("▶ Run analysis", type="primary", width="stretch")
+        check = b2.button("Check available data", width="stretch", disabled=mode != MODE_REAL,
+                          help="Search only, without downloading, to see what exists for your area and dates.")
+    with run_card:
+        if run or check:
+            problem = None
+            if mode != MODE_DEMO and not bbox:
+                problem = "Please choose an area first (step 2)."
+            elif mode == MODE_REAL and ONLINE and not token:
+                problem = "Please paste your free NASA Earthdata token (step 5)."
+            elif mode != MODE_DEMO and period[0] and period[1] and period[0] >= period[1]:
+                problem = "The start date must be before the end date."
+            if problem:
+                st.warning(problem)
             else:
-                result = run_pipeline(cfg, search_only=check)
-                if result is not None:
-                    st.session_state["result"] = result
-                    st.session_state.pop("hyp3_plan", None)  # an order offer belongs to one result
-                    st.session_state.pop("hyp3_ordered", None)
+                try:
+                    cfg = build_config(mode, bbox, period, checks, token, adv, local_dirs)
+                    if ONLINE and mode != MODE_DEMO and cfg.get_aoi().area_km2() > MAX_AOI_KM2:
+                        raise ValueError(f"The online version handles areas up to {MAX_AOI_KM2:,.0f} km². "
+                                         "Draw a smaller box, or run the app on your own computer.")
+                except ValueError as e:
+                    st.warning(str(e))
+                else:
+                    result = run_pipeline(cfg, search_only=check)
+                    if result is not None:
+                        st.session_state["result"] = result
+                        st.session_state.pop("hyp3_plan", None)  # an order offer belongs to one result
+                        st.session_state.pop("hyp3_ordered", None)
     if st.session_state.get("result") is not None:
         show_results(st.session_state["result"])
 
@@ -730,83 +747,93 @@ def page_explore():
 
 
 def page_learn():
-    st.markdown("## How it works")
-    st.markdown(
-        "**Radar satellites can measure ground motion of a few millimetres.** A radar satellite sends microwaves "
-        "to the ground and records the echo. When it passes over the same place again days later, tiny changes "
-        "in the distance between the satellite and the ground show up as a shift in the echo's *phase*. Comparing "
-        "two such images is called **InSAR** (Interferometric Synthetic Aperture Radar). Comparing many images "
-        "over months gives the ground's **speed**, in millimetres per year.")
-    st.markdown("### Two satellites, two wavelengths")
-    st.markdown(
-        "| | NISAR | Sentinel-1 |\n|---|---|---|\n"
-        "| Built by | NASA and ISRO (launched July 2025) | ESA, Copernicus (since 2014) |\n"
-        "| Radar wavelength | 24 cm (L-band) | 5.6 cm (C-band) |\n"
-        "| Sees through vegetation? | Largely yes: works in forests and fields | Mostly no: leaves scramble the "
-        "signal |\n"
-        "| Sensitivity to small motion | Good | Very good |\n"
-        "| Affected by the ionosphere | More (the app corrects it) | Less |\n"
-        "| Archive | New | More than 10 years |")
-    st.markdown("Where **both agree**, the motion is very likely real. Where **only NISAR has data** (often "
-                "under vegetation), you may be seeing something no one could measure before.")
-    st.markdown("### How to read the maps")
-    c1, c2 = st.columns(2, gap="large")
-    c1.markdown("- 🟥 **Red**: the ground is moving **down** (sinking, *subsidence*).\n"
-                "- 🟦 **Blue**: the ground is moving **up** (rising, *uplift*).\n"
-                "- ⬜ **Pale**: little or no motion.\n"
-                "- **No colour**: no reliable measurement (water, dense vegetation for Sentinel-1, steep slopes, "
-                "or too few good images).")
-    c2.markdown("- **Motion is relative** unless GNSS is on. Without GNSS, zero means the typical motion of your "
-                "area; with GNSS stations in the area, the maps are tied to them and zero means no motion.\n"
-                "- **Speeds are averages** over your time period; seasonal ups and downs are averaged out.\n"
-                "- **'Vertical'** assumes the ground moves only up and down. Landslides also move sideways.")
-    st.markdown("### What usually causes ground motion?")
-    st.markdown("- **Groundwater pumping:** broad, bowl-shaped sinking in cities and farmland, centimetres per "
-                "year.\n"
-                "- **Landslides and creep:** small, fast patches on slopes.\n"
-                "- **Mining and tunnelling:** localised sinking.\n"
-                "- **Volcanoes and earthquakes:** uplift or sudden offsets.\n"
-                "- **Building settlement and reclaimed land:** slow sinking of individual structures.")
-    st.markdown("### Forests and biomass (Forests & Biomass module)")
-    st.markdown(
-        "NISAR's 24 cm radar waves pass through leaves and bounce off **branches and trunks**. The part of the echo "
-        "that comes back with its polarisation turned (**HV**, cross-polarised) grows with the amount of wood, so "
-        "it measures **above-ground biomass**: tonnes of dry wood per hectare. The app calibrates this relation "
-        "for your area against the ESA CCI biomass map and checks it on parts of the area it did not train on.\n\n"
-        "- **Saturation:** above roughly 100-150 t/ha the echo stops growing, so very dense forest is shown as "
-        "'at least' that much.\n"
-        "- **Clearing:** cutting a forest removes the trunks, and the HV echo drops by 5-10 dB from one visit to "
-        "the next. The app dates such drops between two NISAR images and compares them with Hansen et al.'s "
-        "global forest-loss maps (2001-2025).\n"
-        "- **Carbon:** about 47 % of dry wood is carbon; each tonne of carbon is 3.67 tonnes of CO₂.")
-    st.markdown("### Glossary")
-    terms = {
-        "InSAR": "Comparing radar images taken at different times to measure ground motion.",
-        "Interferogram (pair)": "The comparison of two radar images; shows motion between their two dates.",
-        "Coherence": "From 0 to 1: how similar the radar echo is between the two dates. Low = unreliable.",
-        "Line of sight (LOS)": "The direction from the ground to the satellite. InSAR measures motion along it.",
-        "Ionosphere": "The upper atmosphere. It delays radar signals, especially longer wavelengths like NISAR's.",
-        "GNSS": "Satellite positioning (GPS and similar). Permanent stations measure ground motion very precisely at "
-                "one point, so they are ideal for checking InSAR.",
-        "Subsidence": "The ground sinking.",
-        "Reference point": "The place assumed to be stable; all motion is measured relative to it.",
-        "GUNW": "NISAR's ready-made 'geocoded unwrapped interferogram' product.",
-        "GCOV": "NISAR's ready-made backscatter product (geocoded polarimetric covariance), used for forests.",
-        "HV backscatter": "The radar echo sent horizontally and received vertically; it comes mostly from branches "
-                          "and trunks, so it tracks forest biomass.",
-        "Above-ground biomass": "The dry weight of trunks, branches and leaves, in tonnes per hectare (t/ha = Mg/ha).",
-    }
-    for k, v in terms.items():
-        st.markdown(f"**{k}**: {v}")
+    tabs = st.tabs(["📡 Radar basics", "🛰️ Ground motion", "🌳 Forests & biomass", "📖 Glossary"])
+    with tabs[0]:
+        st.markdown(
+            "**Radar satellites can measure ground motion of a few millimetres.** A radar satellite sends microwaves "
+            "to the ground and records the echo. When it passes over the same place again days later, tiny changes "
+            "in the distance between the satellite and the ground show up as a shift in the echo's *phase*. Comparing "
+            "two such images is called **InSAR** (Interferometric Synthetic Aperture Radar). Comparing many images "
+            "over months gives the ground's **speed**, in millimetres per year.")
+        st.markdown("### Two satellites, two wavelengths")
+        st.markdown(
+            "| | NISAR | Sentinel-1 |\n|---|---|---|\n"
+            "| Built by | NASA and ISRO (launched July 2025) | ESA, Copernicus (since 2014) |\n"
+            "| Radar wavelength | 24 cm (L-band) | 5.6 cm (C-band) |\n"
+            "| Sees through vegetation? | Largely yes: works in forests and fields | Mostly no: leaves scramble the "
+            "signal |\n"
+            "| Sensitivity to small motion | Good | Very good |\n"
+            "| Affected by the ionosphere | More (the app corrects it) | Less |\n"
+            "| Archive | New | More than 10 years |")
+        st.markdown("Where **both agree**, the motion is very likely real. Where **only NISAR has data** (often "
+                    "under vegetation), you may be seeing something no one could measure before.")
+    with tabs[1]:
+        st.markdown("### How to read the maps")
+        c1, c2 = st.columns(2, gap="large")
+        c1.markdown("- 🟥 **Red**: the ground is moving **down** (sinking, *subsidence*).\n"
+                    "- 🟦 **Blue**: the ground is moving **up** (rising, *uplift*).\n"
+                    "- ⬜ **Pale**: little or no motion.\n"
+                    "- **No colour**: no reliable measurement (water, dense vegetation for Sentinel-1, steep slopes, "
+                    "or too few good images).")
+        c2.markdown("- **Motion is relative** unless GNSS is on. Without GNSS, zero means the typical motion of your "
+                    "area; with GNSS stations in the area, the maps are tied to them and zero means no motion.\n"
+                    "- **Speeds are averages** over your time period; seasonal ups and downs are averaged out.\n"
+                    "- **'Vertical'** assumes the ground moves only up and down. Landslides also move sideways.")
+        st.markdown("### What usually causes ground motion?")
+        st.markdown("- **Groundwater pumping:** broad, bowl-shaped sinking in cities and farmland, centimetres per "
+                    "year.\n"
+                    "- **Landslides and creep:** small, fast patches on slopes.\n"
+                    "- **Mining and tunnelling:** localised sinking.\n"
+                    "- **Volcanoes and earthquakes:** uplift or sudden offsets.\n"
+                    "- **Building settlement and reclaimed land:** slow sinking of individual structures.")
+    with tabs[2]:
+        st.markdown("### Forests and biomass (Forests & Biomass module)")
+        st.markdown(
+            "NISAR's 24 cm radar waves pass through leaves and bounce off **branches and trunks**. The part of the echo "
+            "that comes back with its polarisation turned (**HV**, cross-polarised) grows with the amount of wood, so "
+            "it measures **above-ground biomass**: tonnes of dry wood per hectare. The app calibrates this relation "
+            "for your area against the ESA CCI biomass map and checks it on parts of the area it did not train on.\n\n"
+            "- **Saturation:** above roughly 100-150 t/ha the echo stops growing, so very dense forest is shown as "
+            "'at least' that much.\n"
+            "- **Clearing:** cutting a forest removes the trunks, and the HV echo drops by 5-10 dB from one visit to "
+            "the next. The app dates such drops between two NISAR images and compares them with Hansen et al.'s "
+            "global forest-loss maps (2001-2025).\n"
+            "- **Carbon:** about 47 % of dry wood is carbon; each tonne of carbon is 3.67 tonnes of CO₂.")
+    with tabs[3]:
+        st.markdown("### Glossary")
+        terms = {
+            "InSAR": "Comparing radar images taken at different times to measure ground motion.",
+            "Interferogram (pair)": "The comparison of two radar images; shows motion between their two dates.",
+            "Coherence": "From 0 to 1: how similar the radar echo is between the two dates. Low = unreliable.",
+            "Line of sight (LOS)": "The direction from the ground to the satellite. InSAR measures motion along it.",
+            "Ionosphere": "The upper atmosphere. It delays radar signals, especially longer wavelengths like NISAR's.",
+            "GNSS": "Satellite positioning (GPS and similar). Permanent stations measure ground motion very precisely at "
+                    "one point, so they are ideal for checking InSAR.",
+            "Subsidence": "The ground sinking.",
+            "Reference point": "The place assumed to be stable; all motion is measured relative to it.",
+            "GUNW": "NISAR's ready-made 'geocoded unwrapped interferogram' product.",
+            "GCOV": "NISAR's ready-made backscatter product (geocoded polarimetric covariance), used for forests.",
+            "HV backscatter": "The radar echo sent horizontally and received vertically; it comes mostly from branches "
+                              "and trunks, so it tracks forest biomass.",
+            "Above-ground biomass": "The dry weight of trunks, branches and leaves, in tonnes per hectare (t/ha = Mg/ha).",
+        }
+        cols = st.columns(2, gap="large")
+        for i, (k, v) in enumerate(terms.items()):
+            cols[i % 2].markdown(f"**{k}**  \n{v}")
 
 
 def page_help():
-    st.markdown("## Help & FAQ")
-    st.markdown("### Getting started in 1 minute")
-    st.markdown("1. On **Ground Motion** or **Forests & Biomass**, choose **Try the demo** and press **Run analysis**. No account needed.\n"
-                "2. To study a real place, choose **Analyse a real place**, pick an example place or draw a box, "
-                "and paste your free NASA Earthdata token.\n"
-                "3. Read **In short** at the top of the results, then explore the **Map** tab.")
+    from sarcompare.ui_style import how
+
+    st.markdown('<div class="eyebrow-dark">Getting started in 1 minute</div>', unsafe_allow_html=True)
+    st.markdown(how([
+        ("Try a demo", "Open Ground Motion or Forests & Biomass, keep 'Try the demo' and press Run. No account "
+                       "needed."),
+        ("Pick a real place", "Choose 'Analyse a real place', pick an example or draw a box on the map, and paste "
+                              "your free NASA Earthdata token."),
+        ("Read the results", "Start with 'In short', then explore the map and the tabs; download the report to "
+                             "keep it."),
+    ]), unsafe_allow_html=True)
     faq = {
         "Why was no data found?": (
             "NISAR started producing data in late 2025, so choose dates after that. Ready-made Sentinel-1 "
@@ -873,23 +900,48 @@ def page_help():
             "No. This is a research and learning tool. Results should be verified by qualified experts using field "
             "observations before any decision."),
     }
-    for q, a in faq.items():
-        with st.expander(q):
-            st.markdown(a)
+    groups = {
+        "🚀 Getting started & accounts": ["Why was no data found?", "Is my Earthdata token safe?",
+                                          "How long does it take?", "Who owns the app, and can I use my results?",
+                                          "How should I cite or credit the data?"],
+        "🛰️ Ground Motion": ["There is no Sentinel-1 data for my area. What happens?", "Can I use EGMS in Europe?",
+                             "The two satellites disagree. Which is right?"],
+        "🌳 Forests & Biomass": ["How does radar measure forest biomass?",
+                                "Why does the biomass map say 'at least' in dense forest?",
+                                "Is every 'new clearing' deforestation?",
+                                "Which forest data does the Forests & Biomass module use?"],
+        "⚖️ Using results responsibly": ["Can it predict disasters?", "Can I use this for decisions about safety?"],
+    }
+    placed = {q for qs in groups.values() for q in qs}
+    groups["🚀 Getting started & accounts"] += [q for q in faq if q not in placed]
+    st.markdown('<div class="eyebrow-dark">Frequently asked questions</div>', unsafe_allow_html=True)
+    cols = st.columns(2, gap="large")
+    for i, (group, questions) in enumerate(groups.items()):
+        with cols[i % 2], st.container(border=True, key=f"card_faq_{i}"):
+            st.markdown(f"#### {group}")
+            for q in questions:
+                if q in faq:
+                    with st.expander(q):
+                        st.markdown(faq[q])
 
 
-# ----------------------------------------------------------------------------------------------- main
+PAGES: dict = {}  # page title -> st.Page, filled by main() so pages can link to each other
 
 
 def main():
     from sarcompare.gui_forest import page_forest
+    from sarcompare.gui_home import page_home
 
     st.set_page_config(page_title="OpenSAR Explorer", page_icon="🛰️", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
-    nav = st.navigation([st.Page(page_explore, title="Ground Motion", icon=":material/map:", default=True),
-                         st.Page(page_forest, title="Forests & Biomass", icon=":material/forest:"),
-                         st.Page(page_learn, title="Learn", icon=":material/school:"),
-                         st.Page(page_help, title="Help & FAQ", icon=":material/help:")], position="top")
+    pages = [st.Page(page_home, title="Home", icon=":material/home:", default=True),
+             st.Page(page_explore, title="Ground Motion", icon=":material/terrain:"),
+             st.Page(page_forest, title="Forests & Biomass", icon=":material/forest:"),
+             st.Page(page_learn, title="Learn", icon=":material/school:"),
+             st.Page(page_help, title="Help & FAQ", icon=":material/help:")]
+    PAGES.clear()
+    PAGES.update({pg.title: pg for pg in pages})
+    nav = st.navigation(pages, position="top")
     header(nav.title)
     nav.run()
     footer()

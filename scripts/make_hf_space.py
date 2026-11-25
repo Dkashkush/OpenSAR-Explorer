@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "dist" / "hf-space"
 INCLUDE = ["sarcompare", "app.py", "Dockerfile", ".dockerignore", "requirements.txt", "packages.txt",
-           "pyproject.toml", ".streamlit/config.toml", "examples", "docs"]
+           "pyproject.toml", ".streamlit/config.toml", "examples", "docs", "static"]
 
 HEADER = """---
 title: OpenSAR Explorer

@@ -2,6 +2,7 @@
 [server]
 headless = true
 maxUploadSize = 500   # MB, for published velocity maps / GNSS tables
+enableStaticServing = true   # serves static/ (the app's own fonts) at app/static/
 
 [browser]
 gatherUsageStats = false
@@ -12,7 +13,49 @@ toolbarMode = "viewer"   # hide developer menus from visitors
 [theme]
 base = "light"
 primaryColor = "#1f5f8b"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f1f4f7"
-textColor = "#1f2933"
-font = "sans serif"
+backgroundColor = "#f6f8f7"
+secondaryBackgroundColor = "#eef2f1"
+textColor = "#17212b"
+linkColor = "#1f5f8b"
+borderColor = "#dfe5e8"
+showWidgetBorder = true
+baseRadius = "0.6rem"
+buttonRadius = "0.6rem"
+font = "Inter, sans-serif"
+headingFont = "Plus Jakarta Sans, Inter, sans-serif"
+
+# Fonts served by the app itself (static/fonts, SIL Open Font License; see THIRD_PARTY_NOTICES.md)
+[[theme.fontFaces]]
+family = "Inter"
+url = "app/static/fonts/inter-latin-400-normal.woff2"
+weight = 400
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "app/static/fonts/inter-latin-500-normal.woff2"
+weight = 500
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "app/static/fonts/inter-latin-600-normal.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Inter"
+url = "app/static/fonts/inter-latin-700-normal.woff2"
+weight = 700
+
+[[theme.fontFaces]]
+family = "Plus Jakarta Sans"
+url = "app/static/fonts/plus-jakarta-sans-latin-600-normal.woff2"
+weight = 600
+
+[[theme.fontFaces]]
+family = "Plus Jakarta Sans"
+url = "app/static/fonts/plus-jakarta-sans-latin-700-normal.woff2"
+weight = 700
+
+[[theme.fontFaces]]
+family = "Plus Jakarta Sans"
+url = "app/static/fonts/plus-jakarta-sans-latin-800-normal.woff2"
+weight = 800

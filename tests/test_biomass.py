@@ -225,14 +225,34 @@ def test_forest_results_page(tmp_path):
     assert "New clearing" in text
 
 
-def test_app_has_the_forest_page():
+def test_app_opens_on_home_with_both_modules():
     from streamlit.testing.v1 import AppTest
 
     at = AppTest.from_file(str(Path(__file__).parents[1] / "app.py"), default_timeout=60)
     at.run()
     assert not at.exception
     html = " ".join(md.value for md in at.markdown)
-    assert "Ground Motion module" in html
+    assert 'class="hero"' in html and "Ground Motion" in html and "Forests &amp; Biomass" in html
+    assert "How it works" in html and "Terms of use" in html  # footer
+
+
+def _forest_page():
+    from sarcompare.gui_forest import page_forest
+
+    page_forest()
+
+
+def test_forest_page_steps():
+    from streamlit.testing.v1 import AppTest
+
+    at = AppTest.from_function(_forest_page, default_timeout=60)
+    at.run()
+    assert not at.exception
+    next(r for r in at.radio if "Analyse a real place" in r.options).set_value("Analyse a real place").run()
+    assert not at.exception
+    labels = [b.label for b in at.button]
+    assert "▶ Run forest analysis" in labels and "Use these coordinates" in labels
+    assert any("Hasdeo Arand" in o for sb in at.selectbox for o in sb.options)
 
 
 def test_noisy_reference_does_not_fake_an_early_saturation():

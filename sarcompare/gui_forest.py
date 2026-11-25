@@ -8,8 +8,8 @@ from pathlib import Path
 
 import streamlit as st
 
-from sarcompare.gui import (ICON, MAX_AOI_KM2, MODE_DEMO, MODE_REAL, ONLINE, choose_area, friendly_error, session_id,
-                            show_notes, step, token_step)
+from sarcompare.gui import (ICON, MAX_AOI_KM2, MODE_DEMO, MODE_REAL, ONLINE, choose_area, friendly_error,
+                            download_grid, results_title, session_id, show_map, show_notes, step, token_step)
 
 STAGES = {"search": "Finding NISAR images", "load": "Reading the radar images",
           "reference": "Adding independent forest maps", "change": "Looking for forest loss",
@@ -93,12 +93,8 @@ def show_forest_results(r):
     from sarcompare.biomass.report import plain_summary
     from sarcompare.biomass.webmap import forest_map
 
-    st.markdown("---")
-    title = "## Results"
-    if r.synthetic:
-        title += ' <span class="badge">Synthetic demo data, not a real place</span>'
-    st.markdown(title, unsafe_allow_html=True)
-    with st.container(border=True):
+    results_title(r.synthetic)
+    with st.container(border=True, key="in_short"):
         st.markdown("#### In short")
         for level, text in plain_summary(r):
             st.markdown(f"{ICON.get(level, 'ℹ️')} {text}")
@@ -110,17 +106,14 @@ def show_forest_results(r):
     m[2].metric("Radar saturates at", f"{r.model.sat_agb:.0f} t/ha" if r.model else "n/a",
                 help="Above this, L-band backscatter barely changes with biomass; denser forest shows as 'at least'.")
     m[3].metric("New clearing", f"{stt.get('new_ha', 0):,.0f} ha", help="Cleared during the NISAR period.")
-    m[4].metric("Lost since 2021, not in Hansen", f"{stt.get('unmapped_ha', 0):,.0f} ha",
-                help="Forest in 2021 that is open land now and not in the Hansen loss maps up to 2025.")
+    m[4].metric("Lost since 2021", f"{stt.get('unmapped_ha', 0):,.0f} ha",
+                help="Forest in 2021 that is open land now and not yet in the Hansen loss maps (up to 2025).")
 
-    st.markdown("#### Map")
-    st.caption("Switch layers with the box at the top right. Click a zone for details. Dark green = more biomass.")
-    html = forest_map(r).get_root().render()  # built by the app; values in it are escaped
-    if hasattr(st, "iframe"):
-        st.iframe(html, height=580)
-    else:
-        import streamlit.components.v1 as components
-        components.html(html, height=580)
+    with st.container(border=True, key="panel_forest_map"):
+        st.markdown("#### Map")
+        st.caption("Switch layers with the box at the top right. Click a zone for details. Dark green = more "
+                   "biomass; red = new clearing, orange = lost since 2021, purple = mapped loss 2021-2025.")
+        show_map(forest_map(r).get_root().render())  # built by the app; values in it are escaped
     if r.zones:
         with st.expander(f"Forest-loss zones ({len(r.zones)})", expanded=True):
             rows = [z.to_row() for z in sorted(r.zones, key=lambda z: (list(KINDS).index(z.kind), -z.area_ha))]
@@ -130,7 +123,7 @@ def show_forest_results(r):
                            "Open land now": None if x["open_now_share"] is None else f"{x['open_now_share']:.0%}"}
                           for x in rows], hide_index=True, width="stretch")
 
-    st.markdown("#### More detail")
+    st.markdown('<div class="section"><h2>More detail</h2></div>', unsafe_allow_html=True)
     tabs = st.tabs(["⬇️ Download", "Maps", "Biomass check", "Forest loss", "Data used", "All notes"])
     fig = r.figures
     with tabs[1]:
@@ -171,56 +164,59 @@ def show_forest_results(r):
             st.download_button("⬇️ Download the full report (HTML, opens in any browser)", rep.read_bytes(),
                                file_name=rep.name, type="primary", key="f_dl_report")
         st.markdown("**Maps for GIS software (QGIS, ArcGIS), the zones (CSV, GeoJSON) and the numbers (JSON)**")
-        for key, path in r.outputs.items():
-            path = Path(path)
-            if key != "report" and path.is_file():
-                st.download_button(path.name, path.read_bytes(), file_name=path.name, key=f"f_dl_{key}")
+        download_grid({k: v for k, v in r.outputs.items() if k != "report"}, "f_dl")
 
 
 def page_forest():
     from sarcompare.biomass.webmap import FOREST_PLACES
 
-    step(1, "What would you like to do?")
-    modes = [MODE_DEMO, MODE_REAL]
-    captions = ["No account needed. A made-up forest, written in the real NISAR format, shows how it works.",
-                "Maps biomass and forest loss for a real forest (free NASA account)."]
-    mode = st.radio("Forest mode", modes, captions=captions, horizontal=True, label_visibility="collapsed",
-                    key="f_mode")
+    with st.container(border=True, key="step_f_mode"):
+        step(1, "What would you like to do?")
+        modes = [MODE_DEMO, MODE_REAL]
+        captions = ["No account needed. A made-up forest, written in the real NISAR format, shows how it works.",
+                    "Maps biomass and forest loss for a real forest (free NASA account)."]
+        mode = st.radio("Forest mode", modes, captions=captions, horizontal=True, label_visibility="collapsed",
+                        key="f_mode")
+        if mode == MODE_DEMO:
+            st.info("**Demo:** a made-up 14 × 13 km forest in central India with a mine extension cleared during "
+                    "the monsoon, an older mine cut, and a patch cleared early in 2026. Just press **Run** below.")
     bbox, period, token = None, (None, None), None
     if mode == MODE_DEMO:
-        st.info("**Demo:** a made-up 14 × 13 km forest in central India with a mine extension cleared during the "
-                "monsoon, an older mine cut, and a patch cleared early in 2026. Just press **Run** below.")
         n_next = 2
     else:
-        bbox = choose_area(FOREST_PLACES, ns="f_", step_no=2,
-                           hint="Pick an example forest, or search a place and draw a box over the forest. "
-                                "100-1,000 km² works best.")
-        period = choose_forest_period(3)
-        token = token_step(4)
+        with st.container(border=True, key="step_f_area"):
+            bbox = choose_area(FOREST_PLACES, ns="f_", step_no=2,
+                               hint="Pick an example forest, or search a place and draw a box over the forest. "
+                                    "100-1,000 km² works best.")
+        with st.container(border=True, key="step_f_period"):
+            period = choose_forest_period(3)
+        with st.container(border=True, key="step_f_token"):
+            token = token_step(4)
         n_next = 5
     adv = forest_settings()
-    step(n_next, "Run")
-    if st.button("▶ Run forest analysis", type="primary", key="f_run"):
-        problem = None
-        if mode == MODE_REAL and not bbox:
-            problem = "Please choose an area first (step 2)."
-        elif mode == MODE_REAL and ONLINE and not token:
-            problem = "Please paste your free NASA Earthdata token (step 4)."
-        elif mode == MODE_REAL and period[0] and period[1] and period[0] >= period[1]:
-            problem = "The start date must be before the end date."
-        if problem:
-            st.warning(problem)
-        else:
-            try:
-                cfg = build_forest_config(mode, bbox, period, token, adv)
-                if ONLINE and mode == MODE_REAL and cfg.get_aoi().area_km2() > MAX_AOI_KM2:
-                    raise ValueError(f"The online version handles areas up to {MAX_AOI_KM2:,.0f} km². "
-                                     "Draw a smaller box, or run the app on your own computer.")
-            except ValueError as e:
-                st.warning(str(e))
+    with st.container(border=True, key="step_f_run"):
+        step(n_next, "Run", "The demo takes under a minute; a real forest 2-5 minutes.")
+        if st.button("▶ Run forest analysis", type="primary", key="f_run"):
+            problem = None
+            if mode == MODE_REAL and not bbox:
+                problem = "Please choose an area first (step 2)."
+            elif mode == MODE_REAL and ONLINE and not token:
+                problem = "Please paste your free NASA Earthdata token (step 4)."
+            elif mode == MODE_REAL and period[0] and period[1] and period[0] >= period[1]:
+                problem = "The start date must be before the end date."
+            if problem:
+                st.warning(problem)
             else:
-                result = run_forest(cfg)
-                if result is not None:
-                    st.session_state["forest_result"] = result
+                try:
+                    cfg = build_forest_config(mode, bbox, period, token, adv)
+                    if ONLINE and mode == MODE_REAL and cfg.get_aoi().area_km2() > MAX_AOI_KM2:
+                        raise ValueError(f"The online version handles areas up to {MAX_AOI_KM2:,.0f} km². "
+                                         "Draw a smaller box, or run the app on your own computer.")
+                except ValueError as e:
+                    st.warning(str(e))
+                else:
+                    result = run_forest(cfg)
+                    if result is not None:
+                        st.session_state["forest_result"] = result
     if st.session_state.get("forest_result") is not None:
         show_forest_results(st.session_state["forest_result"])

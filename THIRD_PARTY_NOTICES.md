@@ -49,3 +49,13 @@ under their own open-source licences, as stated in their package metadata (Octob
 | streamlit-folium | see its project page (not stated in the installed package) |
 
 Product reading follows the published conventions of MintPy (Yunjun et al., 2019) and opera-utils.
+
+## Fonts
+
+The web app serves two fonts from `static/fonts/` (only the Latin subsets, unchanged), so visitors' browsers do not
+contact a font service:
+
+| Font | Copyright and licence |
+|---|---|
+| Inter | Copyright 2020 The Inter Project Authors (https://github.com/rsms/inter); SIL Open Font License 1.1 (`static/fonts/Inter-OFL.txt`) |
+| Plus Jakarta Sans | Copyright 2020 The Plus Jakarta Sans Project Authors (https://github.com/tokotype/PlusJakartaSans); SIL Open Font License 1.1 (`static/fonts/PlusJakartaSans-OFL.txt`) |
