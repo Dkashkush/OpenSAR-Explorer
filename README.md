@@ -5,12 +5,19 @@
 **A platform for exploring the Earth with satellite radar (SAR), explained in plain language.**
 Copyright © 2026 Deepa Kumari. All rights reserved (see [Copyright and licence](#copyright-and-licence)).
 
-OpenSAR Explorer is built as a set of modules. The first, **Ground Motion**, is available now:
+OpenSAR Explorer is built as a set of modules. Two are available now:
 
 > **Ground Motion module.** Downloads NISAR (L-band) and Sentinel-1 (C-band) interferometric products over
 > the same area, puts them on one grid, and compares them side by side. It checks them against GNSS and
 > published maps, and explains what the results mean at every step: coverage, coherence, agreement,
 > artefacts, and which moving areas each satellite detects.
+
+> **Forests & Biomass module.** Reads NISAR L-band backscatter (L2 GCOV) over a forest, converts the
+> cross-polarised (HV) echo to above-ground biomass (calibrated against ESA CCI Biomass, with the radar's
+> saturation flagged and a held-out check), and finds deforestation zones: new clearing dated between NISAR
+> images, forest lost since 2021 that the global maps do not show yet, and the current state of loss mapped by
+> Hansen et al. Built with Indian forests in mind (examples: Hasdeo Arand, Mizoram, Western Ghats, Assam,
+> Great Nicobar, Sundarbans). See [Forests & Biomass](#forests--biomass-module).
 
 More modules can be added on the same foundation (see the [Roadmap](#roadmap)).
 
@@ -88,7 +95,7 @@ python.org:
 The app opens in your web browser but runs **on your own computer**. It is built to be easy for
 non-specialists:
 
-- **Explore page, a guided 1-2-3 flow:** choose *Try the demo*, *Analyse a real place*, or *Use files I
+- **Ground Motion page, a guided 1-2-3 flow:** choose *Try the demo*, *Analyse a real place*, or *Use files I
   already have*. **Search any place by name** (the map zooms there), pick an example place, or **draw a box
   on the map**; choose a time period, and optionally turn on extra checks.
 - **Results start with "In short":** a few plain sentences, such as "The ground is sinking by up to 9.5 cm per
@@ -328,6 +335,44 @@ and the responsible authorities.
 - The **interpretation is rule-based** and transparent (`sarcompare/interpret.py`). Treat it as a guide
   and validate with field data, GNSS, well levels, or optical imagery.
 
+## Forests & Biomass module
+
+```
+search GCOV ─► read HH/HV over the area ─► forest maps (WorldCover, Hansen, CCI) ─► forest vs cleared level
+      └─► remove each date's moisture shift ─► biomass model + held-out check ─► forest-loss zones ─► report
+```
+
+1. **Search** ASF for NISAR L2 GCOV images (from June 2026 over India), keep one viewing geometry (track and
+   frame) and up to 8 images spread over the period (first and last included).
+2. **Read** HH and HV backscatter (radiometrically terrain-corrected gamma-naught) over the area only, a few
+   tens of MB out of each multi-GB file, and average to 100 m cells, which also removes speckle.
+3. **Reference data**, read over the area only: ESA WorldCover 2021 (where forest was), Hansen et al. Global
+   Forest Change v1.13 (tree cover 2000 and the year of loss, 2001-2025), and ESA CCI Biomass v7.0 (2024 for
+   calibration, 2020 as the before-loss baseline).
+4. **Moisture correction:** rain and wet soil brighten every forest pixel together (strongly during the
+   monsoon); each image's common shift over intact forest is removed.
+5. **Biomass:** HV = a (1 − e^(−AGB/b)) + c is fitted against CCI biomass on 70 % of the area (2 km blocks)
+   and checked on the other 30 %. Cells within 10 % of the dense-forest level are reported as *at least* the
+   saturation biomass (typically 100-150 Mg/ha at L-band).
+6. **Forest loss:** the HV level separating forest from cleared land is learned from intact forest and
+   Hansen-mapped recent loss (and checked on held-out blocks). Zones of three kinds:
+   - *new*: a lasting HV drop of at least 3 dB from forest to open-land levels, dated between two images;
+   - *unmapped*: forest in 2021 that NISAR sees as open land now, not in the Hansen maps up to 2025;
+   - *hansen*: loss mapped by Hansen et al. since 2021, with the share NISAR still sees as open.
+   Each zone has its area, dates, biomass before, and the CO₂ held in the cleared wood (47 % carbon).
+7. **Outputs:** HTML report, GeoTIFFs (HV, biomass, saturation, zones), zones as CSV and GeoJSON, metrics.
+
+Run it in the app (**Forests & Biomass** page), or:
+
+```bash
+sarcompare forest --demo                                   # synthetic forest, no account needed
+sarcompare forest --bbox 82.55 22.70 82.85 22.95 --name hasdeo --start 2026-06-01
+```
+
+On GitHub: Actions → **Forest test** runs it on real data for six Indian forests (same `EARTHDATA_TOKEN`
+secret). Biomass estimates are research estimates (typically 20-50 % error per hectare, larger near saturation);
+confirm a new clearing on optical images or in the field before acting on it.
+
 ## Project layout
 
 ```
@@ -348,6 +393,9 @@ sarcompare/
   gui.py          graphical interface (sarcompare gui)
   pipeline.py     orchestration with per-stage events (used by the CLI and the web app)
   demo.py         synthetic scene written in real product layouts
+  biomass/        Forests & Biomass module: GCOV reader, forest reference data, biomass model, forest loss,
+                  figures, report, web map, synthetic forest demo
+  gui_forest.py   the app's Forests & Biomass page
 app.py            alternative GUI entry point (streamlit run app.py)
 Start-GUI.bat, start-gui.command, start-gui.sh   double-click launchers
 Dockerfile, requirements.txt, packages.txt, .streamlit/   online hosting
@@ -357,15 +405,21 @@ tests/            unit + end-to-end tests
 
 ## Roadmap
 
-OpenSAR Explorer is designed to grow beyond ground motion. These modules are **ideas, not yet built**:
+OpenSAR Explorer is designed to grow beyond ground motion and forests. These modules are **ideas, not yet
+built**:
 
 | Possible module | What it would show | Data |
 |---|---|---|
 | Floods & surface water | Where land is newly flooded or dried out | NISAR GCOV, Sentinel-1 RTC backscatter |
-| Vegetation & biomass | Forest cover, crop growth and change | NISAR L-band polarimetry |
 | Soil moisture | Wet and dry ground over seasons | NISAR soil-moisture products |
 | Glaciers & fast landslides | Movement too fast for interferometry | NISAR pixel offsets (GOFF) |
 | More satellites | The same comparisons with other radars | e.g. ALOS-4, Sentinel-1C/D |
+
+### Improvements planned for the Forests & Biomass module
+
+- Validate biomass against field plots (e.g. Forest Survey of India inventory) instead of only ESA CCI.
+- Crop growth and plantation cycles from the HH/HV time series.
+- Combine ascending and descending tracks, and use the full GCOV time series for near-real-time clearing alerts.
 
 ### Improvements planned for the Ground Motion module
 

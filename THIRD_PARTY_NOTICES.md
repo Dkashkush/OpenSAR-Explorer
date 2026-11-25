@@ -8,6 +8,10 @@ data and software below, which are **not** covered by that copyright and remain 
 | Data | Owner and terms | Credit used in reports |
 |---|---|---|
 | NISAR L2 GUNW interferograms | NASA/ISRO; distributed by the ASF DAAC; free and open | "NISAR data: NASA/ISRO, distributed by the ASF DAAC" |
+| NISAR L2 GCOV backscatter | NASA/ISRO; distributed by the ASF DAAC; free and open | "NISAR L2 GCOV data: NASA/ISRO, distributed by the ASF DAAC" |
+| ESA WorldCover 10 m 2021 v200 | © ESA WorldCover project 2021, contains modified Copernicus Sentinel data (2021) processed by the ESA WorldCover consortium; CC BY 4.0 | Zanaga, D. et al. (2022), doi:10.5281/zenodo.7254221 |
+| Global Forest Change 2000-2025 v1.13 | University of Maryland (Hansen et al.); CC BY 4.0 | "Source: Hansen/UMD/Google/USGS/NASA"; Hansen, M. C. et al. (2013), *Science* 342, 850-853 |
+| ESA CCI Biomass v7.0 | ESA Climate Change Initiative, Biomass_cci (Santoro & Cartus); NERC EDS CEDA; ESA CCI data policy | dataset citation in each report |
 | Sentinel-1 data | European Union, Copernicus programme (ESA); free, full and open | "Contains modified Copernicus Sentinel data" |
 | ARIA S1 GUNW and OPERA DISP-S1 | NASA JPL; distributed by the ASF DAAC; free and open | "Sentinel-1 interferometric products (ARIA, OPERA (NASA JPL) or HyP3 (ASF)) distributed by the ASF DAAC" |
 | ASF HyP3 on-demand interferograms | Processed by ASF's HyP3 service from Copernicus Sentinel-1 data | as above |

@@ -3,6 +3,7 @@
 All rights reserved; see LICENSE.
 
 Module 1, Ground Motion: compare NISAR and Sentinel-1 InSAR over the same region.
+Module 2, Forests & Biomass (``sarcompare.biomass``): forest biomass and forest loss from NISAR L-band GCOV.
 """
 
 __version__ = "0.1.0"
