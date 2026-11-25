@@ -249,8 +249,18 @@ def separate(hv_db: np.ndarray, forest: np.ndarray, cleared: np.ndarray, test: n
                       int(f_ok.sum()), int(c_ok.sum()), det, fa, (det + 1 - fa) / 2)
 
 
-def detect_drops(cube_db: np.ndarray, forest: np.ndarray, threshold_db: float, drop_db: float = 3.0) -> dict:
-    """Cells whose HV fell by at least ``drop_db`` from forest-like to open-land-like values during the period.
+def open_level(sep: "Separation", drop_db: float = 3.0) -> float:
+    """HV below which land counts as open (cleared): under the learned forest/cleared level AND at least
+    ``drop_db`` below intact forest. Clearing removes the trunks and drops HV by several dB; where the learned
+    level sits closer to forest than that (old clearings regrown as plantation or fallow, so the 'cleared'
+    reference is vegetated again), the physical drop decides."""
+    return float(min(sep.threshold_db, sep.forest_db - drop_db))
+
+
+def detect_drops(cube_db: np.ndarray, forest: np.ndarray, threshold_db: float, drop_db: float = 3.0,
+                 open_db: float | None = None) -> dict:
+    """Cells whose HV fell by at least ``drop_db`` from forest-like (at or above ``threshold_db``) to open-land
+    values (below ``open_db``, default ``threshold_db``) during the period.
 
     The date of the change is the split of the time series into 'before' and 'after' with the largest
     change-point score (difference of the two means, weighted by sqrt(n_before * n_after / n), as in a two-sample
@@ -285,7 +295,8 @@ def detect_drops(cube_db: np.ndarray, forest: np.ndarray, threshold_db: float, d
                 after = np.where(sel, np.nanmedian(cube_db[k:], axis=0), after)
                 n_after = np.where(sel, valid[k:].sum(axis=0), n_after)
     drop = before - after
-    detected = forest & (np.nan_to_num(drop, nan=-np.inf) >= drop_db) & (after < threshold_db) & \
+    open_db = threshold_db if open_db is None else open_db
+    detected = forest & (np.nan_to_num(drop, nan=-np.inf) >= drop_db) & (after < open_db) & \
         (before >= threshold_db)
     return {"drop": drop, "k": np.where(detected, k_best, -1), "detected": detected,
             "confirmed": detected & (n_after >= 2), "before": before, "after": after}

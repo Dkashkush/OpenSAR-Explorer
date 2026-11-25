@@ -277,3 +277,21 @@ def test_degenerate_fit_is_rejected():
     ref = rng.uniform(0, 150, (100, 100))  # no relation at all
     model, notes = A.fit_agb(hv_db, ref, np.ones(hv_db.shape, bool), A.spatial_blocks(hv_db.shape, 20), "x")
     assert model is None and notes[0].level == "warn"
+
+
+def test_regrown_clearings_do_not_make_forest_look_open():
+    """Real cases (Wayanad, Dehing Patkai, Mizoram, Nov 2026): Hansen-mapped clearings had regrown (plantation,
+    jhum fallow), only 0.4-1.9 dB below intact forest. The open-land level must still demand a real drop."""
+    rng = np.random.default_rng(5)
+    shape = (60, 60)
+    hv = rng.normal(-10.5, 0.7, shape)  # intact forest
+    regrown = np.zeros(shape, bool)
+    regrown[:20, :20] = True
+    hv[regrown] = rng.normal(-11.6, 0.7, regrown.sum())  # "cleared" reference, vegetated again
+    hv[40:45, 40:45] = -17.0  # one real clearing
+    sep = A.separate(hv, ~regrown, regrown, A.spatial_blocks(shape, 10), "regrown")
+    level = A.open_level(sep, 3.0)
+    assert level <= sep.forest_db - 3.0 < sep.threshold_db
+    cube = np.repeat(hv[None], 4, axis=0)
+    now_open = A.open_now(cube, level, margin_db=0.0)
+    assert now_open[40:45, 40:45].all() and now_open[:40, :40].mean() < 0.01

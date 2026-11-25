@@ -36,6 +36,10 @@ def plain_summary(r) -> list[tuple[str, str]]:
                           f"{st['forest_ha']:,.0f} ha). Radar stops 'seeing' extra biomass above about "
                           f"{r.model.sat_agb:.0f} t/ha; {st['saturated_share']:.0%} of the forest is that dense, so "
                           "the true total is higher."))
+    elif r.ref.get("cci") is not None:
+        out.append((WARN, "Biomass is not estimated here: the ESA reference biomass map and NISAR disagree too much "
+                          "over this forest to calibrate one against the other (see the biomass notes). The "
+                          "backscatter map still shows where the canopy is dense."))
     elif r.ref.get("cci") is None:
         out.append((WARN, "Biomass could not be calculated: the reference biomass map (ESA CCI) was not available. "
                           "The backscatter map still shows where vegetation is dense."))

@@ -317,6 +317,7 @@ class ForestPipeline:
         r, cfg = self.result, self.cfg
         forest, intact, water, built = self._masks()
         r.forest, r.intact = forest, intact
+        r.stats["forest_ha"] = float(forest.sum() * r.grid.cell_ha)
         r.hv_db, r.offsets_db = A.normalise_dates(r.hv_db, intact if intact.sum() >= 50 else forest)
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
@@ -350,15 +351,24 @@ class ForestPipeline:
                                                     "what each looks like to NISAR; forest loss is not mapped.")])
             return
         gap = sep.forest_db - sep.cleared_db
-        level = GOOD if sep.balanced_accuracy >= 0.85 else (INFO if sep.balanced_accuracy >= 0.7 else WARN)
+        strong = sep.balanced_accuracy >= 0.9 and gap >= cfg.drop_db
+        level = GOOD if strong else (INFO if sep.balanced_accuracy >= 0.75 else WARN)
         notes.append(Note("change", level,
-                          f"NISAR tells forest from cleared land: intact forest {sep.forest_db:.1f} dB, {ref_name} "
-                          f"{sep.cleared_db:.1f} dB (HV, {gap:.1f} dB apart). On held-out blocks it sees "
-                          f"{sep.detection:.0%} of the cleared cells as open land and calls {sep.false_alarm:.0%} of "
-                          f"intact forest open (balanced accuracy {sep.balanced_accuracy:.0%})."))
+                          f"Intact forest {sep.forest_db:.1f} dB, {ref_name} {sep.cleared_db:.1f} dB (HV, {gap:.1f} dB "
+                          f"apart). On held-out blocks NISAR sees {sep.detection:.0%} of those cells as open land and "
+                          f"calls {sep.false_alarm:.0%} of intact forest open (balanced accuracy "
+                          f"{sep.balanced_accuracy:.0%})."))
+        level_db = A.open_level(sep, cfg.drop_db)
+        r.stats["open_level_db"] = level_db
+        if gap < cfg.drop_db:
+            notes.append(Note("change", INFO,
+                              f"Here the mapped clearings are mostly vegetated again (plantations and fallows regrow "
+                              f"within a few years), only {gap:.1f} dB below intact forest. Land counts as open only "
+                              f"where HV is at least {cfg.drop_db:.0f} dB below intact forest (below {level_db:.1f} dB), "
+                              "so regrown clearings are not counted as lost."))
         if len(r.scenes) >= 2:
-            r.drops = A.detect_drops(r.hv_db, forest, sep.threshold_db, cfg.drop_db)
-        r.open_now = A.open_now(r.hv_db, sep.threshold_db) & ~water & ~built
+            r.drops = A.detect_drops(r.hv_db, forest, sep.threshold_db, cfg.drop_db, open_db=level_db)
+        r.open_now = A.open_now(r.hv_db, level_db, margin_db=0.0) & ~water & ~built
         self.emit("change", "Compared NISAR with mapped forest and forest loss", notes)
 
     # ------------------------------------------------------------------ biomass
@@ -376,14 +386,23 @@ class ForestPipeline:
             usable &= ~r.drops["detected"]
         model, notes = A.fit_agb(r.hv_all_db, cci["agb"], usable, r.test, f"ESA CCI Biomass {cci['year']}")
         r.model = model
+        fc = r.forest & np.isfinite(cci["agb"])
+        if fc.any():
+            r.stats["cci_agb_mean_forest"] = float(np.mean(cci["agb"][fc]))
+        if model is None and fc.any():
+            ok = usable & np.isfinite(r.hv_all_db) & np.isfinite(cci["agb"])
+            if ok.sum() > 50:
+                top = r.hv_all_db >= np.percentile(r.hv_all_db[ok], 80)
+                notes.append(Note("biomass", INFO,
+                                  f"ESA CCI {cci['year']} gives {r.stats['cci_agb_mean_forest']:.0f} Mg/ha on average over "
+                                  f"this forest, and a median of only {np.median(cci['agb'][ok & top]):.0f} Mg/ha where "
+                                  "NISAR sees the densest canopy (top 20 % of HV): the two disagree too much here to "
+                                  "calibrate one against the other."))
         if model is not None:
             r.agb, r.saturated = model.invert(A.from_db(r.hv_now_db))
             f = r.forest & np.isfinite(r.agb)
-            fc = r.forest & np.isfinite(cci["agb"])
-            if fc.any():
-                r.stats["cci_agb_mean_forest"] = float(np.mean(cci["agb"][fc]))
             if f.any():
-                r.stats.update(forest_ha=float(f.sum() * r.grid.cell_ha), agb_mean_forest=float(np.mean(r.agb[f])),
+                r.stats.update(agb_mean_forest=float(np.mean(r.agb[f])),
                                agb_total_t=float(np.sum(r.agb[f]) * r.grid.cell_ha),
                                saturated_share=float(np.mean(r.saturated[f])))
                 notes.append(Note("biomass", INFO,
