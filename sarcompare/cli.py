@@ -95,6 +95,44 @@ def cmd_demo(args) -> int:
     return 0
 
 
+def cmd_forest(args) -> int:
+    """Forests & Biomass: biomass and forest loss from NISAR GCOV for one area (or the synthetic demo)."""
+    from .biomass.demo import forest_demo_config
+    from .biomass.pipeline import ForestConfig, ForestPipeline
+    from .biomass.report import plain_summary
+
+    if args.demo:
+        cfg = forest_demo_config(args.data_dir or "data/demo_forest", args.output_dir or "outputs")
+    else:
+        if not args.bbox:
+            print("error: give --bbox WEST SOUTH EAST NORTH (or --demo)", file=sys.stderr)
+            return 2
+        cfg = ForestConfig(aoi=list(args.bbox), name=args.name, start=args.start, end=args.end,
+                           gcov_source="LOCAL" if args.gcov_dir else "ASF", gcov_dir=args.gcov_dir,
+                           flight_direction=args.direction, output_dir=args.output_dir or "outputs")
+    for key in ("max_dates", "resolution_m", "drop_db", "min_zone_ha"):
+        if getattr(args, key) is not None:
+            setattr(cfg, key, getattr(args, key))
+
+    def show(ev):
+        print(f"[{ev.stage}] {ev.message}")
+        for n in ev.notes:
+            print(f"    {n}")
+
+    r = ForestPipeline(cfg, on_event=show).run()
+    print("\nIn short:")
+    for _, text in plain_summary(r):
+        print("  - " + text.replace("**", ""))
+    if r.zones:
+        print(f"\n{'zone':>4}  {'type':<46} {'ha':>8}  {'lat':>9} {'lon':>9}  when")
+        for z in r.zones[:40]:
+            row = z.to_row()
+            print(f"{row['zone']:>4}  {row['type']:<46} {row['area_ha']:>8.1f}  {row['latitude']:>9.4f} "
+                  f"{row['longitude']:>9.4f}  {row['when']}")
+    print(f"\nReport: {r.outputs.get('report')}")
+    return 0
+
+
 def cmd_gui(args) -> int:
     """Open the graphical interface in the web browser (it runs locally; nothing is uploaded)."""
     from pathlib import Path
@@ -111,7 +149,8 @@ def cmd_gui(args) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="sarcompare", description="OpenSAR Explorer: compare NISAR and Sentinel-1 ground motion over one area.")
+    ap = argparse.ArgumentParser(prog="sarcompare", description="OpenSAR Explorer: NISAR and Sentinel-1 ground motion, and NISAR forest biomass and "
+                                 "forest loss, over one area.")
     ap.add_argument("--debug", action="store_true", help="show full tracebacks")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("search", help="search ASF and show the pairs that would be used")
@@ -140,6 +179,21 @@ def main(argv=None) -> int:
     d.add_argument("--data-dir", default="data/demo")
     d.add_argument("--output-dir", default="outputs")
     d.set_defaults(func=cmd_demo)
+    f = sub.add_parser("forest", help="forest biomass and forest loss from NISAR GCOV (Forests & Biomass module)")
+    f.add_argument("--bbox", nargs=4, type=float, metavar=("WEST", "SOUTH", "EAST", "NORTH"))
+    f.add_argument("--name", default="forest_area")
+    f.add_argument("--start", help="first date, YYYY-MM-DD")
+    f.add_argument("--end", help="last date, YYYY-MM-DD")
+    f.add_argument("--direction", choices=["ASCENDING", "DESCENDING"])
+    f.add_argument("--max-dates", type=int, help="images to use, spread over the period (default 8)")
+    f.add_argument("--resolution-m", type=float, help="map cell size in metres (default 100)")
+    f.add_argument("--drop-db", type=float, help="HV drop that counts as clearing (default 3 dB)")
+    f.add_argument("--min-zone-ha", type=float, help="smallest forest-loss zone (default 2 ha)")
+    f.add_argument("--gcov-dir", help="use GCOV .h5 files from this folder instead of searching ASF")
+    f.add_argument("--output-dir")
+    f.add_argument("--data-dir", help="demo only: where to write the synthetic files")
+    f.add_argument("--demo", action="store_true", help="run on the synthetic forest (no account needed)")
+    f.set_defaults(func=cmd_forest)
     g = sub.add_parser("gui", help="open the graphical interface in your web browser")
     g.add_argument("--port", type=int, default=8501)
     g.add_argument("--no-browser", action="store_true", help="do not open a browser window automatically")

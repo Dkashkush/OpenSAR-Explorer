@@ -99,12 +99,22 @@ def save_upload(f) -> str:
     return str(path)
 
 
-def header():
+MODULES = {
+    "Ground Motion": ("Ground Motion module", "See where the ground is sinking or rising, measured by two radar "
+                      "satellites (NISAR and Sentinel-1), side by side, explained in plain language."),
+    "Forests & Biomass": ("Forests & Biomass module", "Map how much wood a forest holds and find where it is being "
+                          "cleared, with NISAR's L-band radar that sees into the canopy, checked against independent "
+                          "forest maps."),
+}
+
+
+def header(page: str = "Ground Motion"):
+    chip, text = MODULES.get(page, ("", "Satellite radar for ground motion and forests, explained in plain "
+                                        "language."))
+    chip_html = f'<span class="module">{chip}</span> ' if chip else ""
     st.markdown(
         f'<div class="app-banner"><h1>🛰️ OpenSAR Explorer <span class="byline">created by {__author__}</span></h1>'
-        '<p><span class="module">Ground Motion module</span> See where the ground is sinking or rising, '
-        "measured by two radar satellites (NISAR and Sentinel-1), side by side, explained in plain "
-        "language.</p></div>", unsafe_allow_html=True)
+        f"<p>{chip_html}{text}</p></div>", unsafe_allow_html=True)
 
 
 def footer():
@@ -124,50 +134,55 @@ def footer():
 # ----------------------------------------------------------------------------------------------- Explore page
 
 
-def choose_area():
-    """Step 2: map + example places + typed coordinates. Returns (W, S, E, N) or None."""
+def choose_area(examples: dict | None = None, ns: str = "", step_no: int = 2,
+                hint: str = "Search for any place, then draw a box around the area you want on the map."):
+    """Step ``step_no``: map + example places + typed coordinates. Returns (W, S, E, N) or None.
+
+    ``ns`` prefixes the page's session keys, so each module keeps its own area and examples."""
     from streamlit_folium import st_folium
 
     from sarcompare.aoi import AOI
     from sarcompare.maps import EXAMPLE_PLACES, bbox_from_drawing, box_around, find_place, picker_map
 
-    step(2, "Where?", "Search for any place, then draw a box around the area you want on the map.")
+    examples = EXAMPLE_PLACES if examples is None else examples
+
+    step(step_no, "Where?", hint)
     side, mapcol = st.columns([2, 3], gap="large")
     with side:
-        with st.form("place_search", border=False):
+        with st.form(ns + "place_search", border=False):
             q1, q2 = st.columns([3, 1], vertical_alignment="bottom")
             query = q1.text_input("Search a place", placeholder="e.g. Jakarta, Tehran, Venice, Joshimath")
             searched = q2.form_submit_button("Search", width="stretch")
         if searched:
             try:
-                st.session_state["places"] = find_place(query)
-                if not st.session_state["places"]:
+                st.session_state[ns + "places"] = find_place(query)
+                if not st.session_state[ns + "places"]:
                     st.warning(f"No place called '{query}' was found. Try adding the country, e.g. 'Delhi, India'.")
             except OSError:
-                st.session_state["places"] = []
+                st.session_state[ns + "places"] = []
                 st.error("Place search is not reachable right now. Zoom the map by hand, or type coordinates below.")
-        places = st.session_state.get("places") or []
+        places = st.session_state.get(ns + "places") or []
         if places:
             names = [p["name"] for p in places]
-            pick = st.selectbox("Found", names, key="place_pick") if len(places) > 1 else names[0]
+            pick = st.selectbox("Found", names, key=ns + "place_pick") if len(places) > 1 else names[0]
             found = places[names.index(pick)]
-            if st.session_state.get("_view_for") != found["name"]:  # new place: move the map there
-                st.session_state["_view_for"] = found["name"]
-                st.session_state["view"] = (found["lat"], found["lon"], 11)
-                st.session_state["bbox"] = None
+            if st.session_state.get(ns + "_view_for") != found["name"]:  # new place: move the map there
+                st.session_state[ns + "_view_for"] = found["name"]
+                st.session_state[ns + "view"] = (found["lat"], found["lon"], 11)
+                st.session_state[ns + "bbox"] = None
             st.caption(f"Map moved to **{found['name']}**. Now draw your box on the map (square ▢ button), or:")
             if st.button("Use a box around this place", width="stretch"):
-                st.session_state["bbox"] = box_around(found["lat"], found["lon"], found["bbox"],
+                st.session_state[ns + "bbox"] = box_around(found["lat"], found["lon"], found["bbox"],
                                                       max_km2=min(MAX_AOI_KM2, 900) if ONLINE else 900)
                 st.rerun()
-        options = ["(or choose an example place)"] + list(EXAMPLE_PLACES)
-        place = st.selectbox("Example places", options, key="place")
-        if place != options[0] and st.session_state.get("_place_applied") != place:
-            st.session_state["bbox"] = EXAMPLE_PLACES[place]
-            st.session_state["_place_applied"] = place
-            st.session_state["view"] = None
+        options = ["(or choose an example place)"] + list(examples)
+        place = st.selectbox("Example places", options, key=ns + "place")
+        if place != options[0] and st.session_state.get(ns + "_place_applied") != place:
+            st.session_state[ns + "bbox"] = examples[place]
+            st.session_state[ns + "_place_applied"] = place
+            st.session_state[ns + "view"] = None
         with st.expander("Type coordinates instead"):
-            cur = st.session_state.get("bbox") or (-99.25, 19.25, -98.95, 19.55)
+            cur = st.session_state.get(ns + "bbox") or (-99.25, 19.25, -98.95, 19.55)
             c1, c2 = st.columns(2)
             w = c1.number_input("West (longitude)", -180.0, 180.0, float(cur[0]), format="%.4f")
             e = c2.number_input("East (longitude)", -180.0, 180.0, float(cur[2]), format="%.4f")
@@ -175,11 +190,11 @@ def choose_area():
             n = c2.number_input("North (latitude)", -90.0, 90.0, float(cur[3]), format="%.4f")
             if st.button("Use these coordinates"):
                 if w < e and s < n:
-                    st.session_state["bbox"] = (w, s, e, n)
-                    st.session_state["view"] = None
+                    st.session_state[ns + "bbox"] = (w, s, e, n)
+                    st.session_state[ns + "view"] = None
                 else:
                     st.error("West must be less than East, and South less than North.")
-        bbox = st.session_state.get("bbox")
+        bbox = st.session_state.get(ns + "bbox")
         if bbox:
             area = AOI.from_bbox(*bbox).area_km2()
             st.metric("Selected area", f"{area:,.0f} km²")
@@ -194,14 +209,14 @@ def choose_area():
         st.markdown("**1.** Find your place with the search on the left, or zoom the map with the mouse wheel.  \n"
                     "**2.** Click the **square ▢ button** on the left of the map.  \n"
                     "**3.** Click and drag to draw a box around your area. Draw again to replace it.")
-        out = st_folium(picker_map(bbox, view=st.session_state.get("view")), height=430, use_container_width=True,
-                        returned_objects=["last_active_drawing"], key="picker")
+        out = st_folium(picker_map(bbox, view=st.session_state.get(ns + "view")), height=430, use_container_width=True,
+                        returned_objects=["last_active_drawing"], key=ns + "picker")
         drawn = bbox_from_drawing((out or {}).get("last_active_drawing"))
-        if drawn and drawn != st.session_state.get("_last_drawn"):
-            st.session_state["_last_drawn"] = drawn
-            st.session_state["bbox"] = drawn
+        if drawn and drawn != st.session_state.get(ns + "_last_drawn"):
+            st.session_state[ns + "_last_drawn"] = drawn
+            st.session_state[ns + "bbox"] = drawn
             st.rerun()
-    return st.session_state.get("bbox")
+    return st.session_state.get(ns + "bbox")
 
 
 def choose_period():
@@ -397,7 +412,7 @@ def friendly_error(e: Exception) -> str:
     low = msg.lower()
     if name == "AccessError":  # already a plain-language reason with the fix
         return f"Could not get the data files: {msg}"
-    if name == "HyP3Error":  # plain-language reason from the HyP3 order/status code
+    if name in ("HyP3Error", "NoGCOVError"):  # already plain-language reasons
         return msg
     if "credential" in low or ("token" in low and ("invalid" in low or "unauthor" in low)):
         return "Your Earthdata token was not accepted. Check that you pasted all of it, or generate a new one."
@@ -751,6 +766,18 @@ def page_learn():
                 "- **Mining and tunnelling:** localised sinking.\n"
                 "- **Volcanoes and earthquakes:** uplift or sudden offsets.\n"
                 "- **Building settlement and reclaimed land:** slow sinking of individual structures.")
+    st.markdown("### Forests and biomass (Forests & Biomass module)")
+    st.markdown(
+        "NISAR's 24 cm radar waves pass through leaves and bounce off **branches and trunks**. The part of the echo "
+        "that comes back with its polarisation turned (**HV**, cross-polarised) grows with the amount of wood, so "
+        "it measures **above-ground biomass**: tonnes of dry wood per hectare. The app calibrates this relation "
+        "for your area against the ESA CCI biomass map and checks it on parts of the area it did not train on.\n\n"
+        "- **Saturation:** above roughly 100-150 t/ha the echo stops growing, so very dense forest is shown as "
+        "'at least' that much.\n"
+        "- **Clearing:** cutting a forest removes the trunks, and the HV echo drops by 5-10 dB from one visit to "
+        "the next. The app dates such drops between two NISAR images and compares them with Hansen et al.'s "
+        "global forest-loss maps (2001-2025).\n"
+        "- **Carbon:** about 47 % of dry wood is carbon; each tonne of carbon is 3.67 tonnes of CO₂.")
     st.markdown("### Glossary")
     terms = {
         "InSAR": "Comparing radar images taken at different times to measure ground motion.",
@@ -763,6 +790,10 @@ def page_learn():
         "Subsidence": "The ground sinking.",
         "Reference point": "The place assumed to be stable; all motion is measured relative to it.",
         "GUNW": "NISAR's ready-made 'geocoded unwrapped interferogram' product.",
+        "GCOV": "NISAR's ready-made backscatter product (geocoded polarimetric covariance), used for forests.",
+        "HV backscatter": "The radar echo sent horizontally and received vertically; it comes mostly from branches "
+                          "and trunks, so it tracks forest biomass.",
+        "Above-ground biomass": "The dry weight of trunks, branches and leaves, in tonnes per hectare (t/ha = Mg/ha).",
     }
     for k, v in terms.items():
         st.markdown(f"**{k}**: {v}")
@@ -771,7 +802,7 @@ def page_learn():
 def page_help():
     st.markdown("## Help & FAQ")
     st.markdown("### Getting started in 1 minute")
-    st.markdown("1. On **Explore**, choose **Try the demo** and press **Run analysis**. No account needed.\n"
+    st.markdown("1. On **Ground Motion** or **Forests & Biomass**, choose **Try the demo** and press **Run analysis**. No account needed.\n"
                 "2. To study a real place, choose **Analyse a real place**, pick an example place or draw a box, "
                 "and paste your free NASA Earthdata token.\n"
                 "3. Read **In short** at the top of the results, then explore the **Map** tab.")
@@ -819,6 +850,24 @@ def page_help():
             "tell **whether or when** a landslide will fail, a building will be damaged, or an earthquake will "
             "happen. That needs continuous monitoring, ground instruments, field investigation and the responsible "
             "authorities. Think of it as hazard screening, not a forecast."),
+        "How does radar measure forest biomass?": (
+            "NISAR's L-band radar (24 cm waves) sees into the canopy; the cross-polarised (HV) echo comes mostly "
+            "from branches and trunks and grows with the amount of wood. On **Forests & Biomass**, the app fits that "
+            "relation for your area against the ESA CCI Biomass map, checks it on 30 % of the area kept aside, and "
+            "converts every 100 m cell to tonnes per hectare."),
+        "Why does the biomass map say 'at least' in dense forest?": (
+            "Above about 100-150 t/ha the L-band echo barely changes with more wood (it 'saturates'), so a small "
+            "change in the echo would mean a huge change in biomass. Those cells are shown as 'at least' the "
+            "saturation level found for your area, and totals there are lower bounds."),
+        "Is every 'new clearing' deforestation?": (
+            "Not necessarily. A sudden, lasting drop of the radar echo usually means trees were removed (mining, "
+            "felling, shifting cultivation), but fire, flooding or storm damage can do the same. The app labels "
+            "zones as new (during the NISAR period), lost since 2021 but not yet in the global maps, or already "
+            "mapped by Hansen et al. Confirm on recent optical images or in the field before acting."),
+        "Which forest data does the Forests & Biomass module use?": (
+            "NISAR L2 GCOV backscatter (NASA/ISRO, via ASF), ESA WorldCover 2021 for where forest was, Hansen et "
+            "al. Global Forest Change v1.13 for mapped loss 2001-2025 (Source: Hansen/UMD/Google/USGS/NASA), and "
+            "ESA CCI Biomass v7.0 for calibration. All are free; only NISAR needs your Earthdata token."),
         "Can I use this for decisions about safety?": (
             "No. This is a research and learning tool. Results should be verified by qualified experts using field "
             "observations before any decision."),
@@ -832,12 +881,15 @@ def page_help():
 
 
 def main():
-    st.set_page_config(page_title="OpenSAR Explorer: Ground Motion", page_icon="🛰️", layout="wide")
+    from sarcompare.gui_forest import page_forest
+
+    st.set_page_config(page_title="OpenSAR Explorer", page_icon="🛰️", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
-    nav = st.navigation([st.Page(page_explore, title="Explore", icon=":material/map:", default=True),
+    nav = st.navigation([st.Page(page_explore, title="Ground Motion", icon=":material/map:", default=True),
+                         st.Page(page_forest, title="Forests & Biomass", icon=":material/forest:"),
                          st.Page(page_learn, title="Learn", icon=":material/school:"),
                          st.Page(page_help, title="Help & FAQ", icon=":material/help:")], position="top")
-    header()
+    header(nav.title)
     nav.run()
     footer()
 
