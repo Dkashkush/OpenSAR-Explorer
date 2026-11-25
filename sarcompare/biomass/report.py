@@ -65,8 +65,9 @@ def plain_summary(r) -> list[tuple[str, str]]:
                           + (f"; NISAR sees {still:.0%} of the larger loss zones still open." if han else ".")))
     co2 = st.get("co2_t_new_unmapped")
     if co2:
-        out.append((INFO, f"The newly cleared forest held roughly {co2 / 1e3:,.1f} thousand tonnes of CO₂ in its "
-                          "above-ground wood (rough estimate: 47 % of biomass is carbon)."))
+        amount = f"{co2 / 1e3:,.1f} thousand tonnes" if co2 >= 1e4 else f"{co2:,.0f} tonnes"
+        out.append((INFO, f"The newly cleared forest held roughly {amount} of CO₂ in its above-ground wood (rough "
+                          "estimate: 47 % of biomass is carbon)."))
     sep, m = r.separation, r.model
     checks = []
     if sep is not None:

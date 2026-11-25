@@ -233,3 +233,27 @@ def test_app_has_the_forest_page():
     assert not at.exception
     html = " ".join(md.value for md in at.markdown)
     assert "Ground Motion module" in html
+
+
+def test_noisy_reference_does_not_fake_an_early_saturation():
+    """Real case (Hasdeo Arand, Nov 2026): ESA CCI reads near zero in a third of the forest. Fitting against
+    biomass-binned medians alone then saturated at 12 Mg/ha; the bisector-style fit must stay realistic."""
+    rng = np.random.default_rng(3)
+    a, b, c = 0.06, 60.0, 0.02
+    agb = rng.uniform(0, 140, (200, 200))
+    hv = (a * (1 - np.exp(-agb / b)) + c) * rng.gamma(80, 1 / 80, agb.shape)
+    ref = agb * rng.lognormal(0, 0.6, agb.shape)
+    low = rng.random(agb.shape) < 0.35
+    ref[low] = agb[low] * 0.08
+    model, _ = A.fit_agb(A.to_db(hv), ref, np.ones(agb.shape, bool), A.spatial_blocks(agb.shape, 20), "noisy")
+    assert model is not None and model.sat_agb > 50
+    pred, _ = model.invert(hv)
+    assert np.corrcoef(pred.ravel(), agb.ravel())[0, 1] > 0.8  # close to the truth, despite the reference
+
+
+def test_degenerate_fit_is_rejected():
+    rng = np.random.default_rng(4)
+    hv_db = rng.normal(-12, 1, (100, 100))
+    ref = rng.uniform(0, 150, (100, 100))  # no relation at all
+    model, notes = A.fit_agb(hv_db, ref, np.ones(hv_db.shape, bool), A.spatial_blocks(hv_db.shape, 20), "x")
+    assert model is None and notes[0].level == "warn"

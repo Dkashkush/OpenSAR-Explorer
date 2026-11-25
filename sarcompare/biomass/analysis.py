@@ -81,6 +81,17 @@ def _metrics(pred: np.ndarray, ref: np.ndarray) -> dict:
             "rmse": rmse, "bias": float(np.mean(p - r)), "rel_rmse": rmse / float(np.mean(r)) if r.mean() > 0 else float("nan")}
 
 
+def _binned(agb: np.ndarray, hv_db: np.ndarray, by: np.ndarray, n_bins: int = 25, min_n: int = 15) -> list[dict]:
+    """Medians of biomass and HV in quantile bins of ``by``."""
+    edges = np.unique(np.quantile(by, np.linspace(0, 1, n_bins + 1)))
+    out = []
+    for lo, hi in zip(edges[:-1], edges[1:]):
+        sel = (by >= lo) & ((by < hi) if hi < edges[-1] else (by <= hi))
+        if sel.sum() >= min_n:
+            out.append({"agb": float(np.median(agb[sel])), "hv_db": float(np.median(hv_db[sel])), "n": int(sel.sum())})
+    return out
+
+
 @dataclass
 class AGBModel:
     a: float
@@ -88,7 +99,7 @@ class AGBModel:
     c: float
     sat_agb: float  # Mg/ha; estimates above it are lower bounds
     max_ref: float  # densest reference biomass used in the fit
-    curve: list[dict]  # binned medians used in the fit: agb, hv_db, n
+    curve: list[dict]  # binned medians used in the fit (by biomass, then by HV): agb, hv_db, n
     train: dict
     test: dict
     test_below_sat: dict
@@ -128,36 +139,46 @@ def fit_agb(hv_db: np.ndarray, agb_ref: np.ndarray, usable: np.ndarray, test: np
         return None, [Note("biomass", WARN, f"Only {int(tr.sum())} cells have both NISAR backscatter and reference "
                                             "biomass; too few to calibrate a biomass model, so only the HV "
                                             "backscatter map is shown.")]
-    agb, hv = agb_ref[tr].astype("float64"), from_db(hv_db[tr])
-    edges = np.unique(np.quantile(agb, np.linspace(0, 1, 25)))
-    curve = []
-    for lo, hi in zip(edges[:-1], edges[1:]):
-        sel = (agb >= lo) & ((agb < hi) if hi < edges[-1] else (agb <= hi))
-        if sel.sum() >= 15:
-            curve.append({"agb": float(np.median(agb[sel])), "hv": float(np.median(hv[sel])), "n": int(sel.sum())})
-    if len(curve) < 4 or np.ptp([c["agb"] for c in curve]) < 20:
-        return None, [Note("biomass", WARN, "The reference biomass barely varies over this area (mostly one kind of "
-                                            "land), so the radar cannot be calibrated here. Choose an area with "
-                                            "both forest and open land.")]
+    agb, hv_tr_db = agb_ref[tr].astype("float64"), hv_db[tr].astype("float64")
+    # Both variables are noisy: the reference biomass often by +-50 % per cell, HV by about a dB. Medians binned
+    # by biomass alone let the biomass errors flatten the curve and fake an early saturation; binned by HV alone,
+    # the HV scatter hides the saturation. The curve is fitted through both sets of binned medians, the
+    # non-linear analogue of the OLS bisector (Isobe et al. 1990), which stays close to the truth in both cases.
+    curve = _binned(agb, hv_tr_db, by=agb) + _binned(agb, hv_tr_db, by=hv_tr_db)
+    if len(curve) < 8 or np.ptp([c["agb"] for c in curve]) < 20:
+        return None, [Note("biomass", WARN, "The reference biomass barely changes with the radar backscatter over "
+                                            "this area (mostly one kind of land, or a reference map that is very "
+                                            "uncertain here), so biomass cannot be calibrated. The HV backscatter map "
+                                            "still shows where vegetation is dense.")]
     xa = np.array([c["agb"] for c in curve])
-    ya = np.array([c["hv"] for c in curve])
-    w = 1 / np.sqrt([c["n"] for c in curve])
+    ya = np.array([c["hv_db"] for c in curve])
 
-    def f(x, a, b, c):
-        return a * (1 - np.exp(-x / b)) + c
+    def f_db(x, a, b, c):
+        return 10 * np.log10(a * (1 - np.exp(-x / b)) + c)
 
     try:
-        p0 = [max(ya.max() - ya.min(), 1e-4), max(30.0, float(np.median(xa))), max(ya.min(), 1e-5)]
-        (a, b, c), _ = curve_fit(f, xa, ya, p0=p0, sigma=w * ya, bounds=([1e-6, 5.0, 1e-6], [2.0, 3000.0, 2.0]),
-                                 maxfev=20000)
+        lo, hi = from_db(ya.min()), from_db(ya.max())
+        (a, b, c), _ = curve_fit(f_db, xa, ya, p0=[max(hi - lo, 1e-5), max(30.0, float(np.median(xa))), lo],
+                                 bounds=([1e-7, 5.0, 1e-7], [2.0, 3000.0, 2.0]), maxfev=40000)
     except (RuntimeError, ValueError) as e:
         return None, [Note("biomass", WARN, f"The biomass model could not be fitted ({e}).")]
-    max_ref = float(np.percentile(agb, 99))
+    max_ref = float(np.percentile(agb, 99))  # densest reference biomass the fit can be checked against
     sat = b * math.log(1 / (1 - SATURATION_SHARE))
     in_range = sat <= max_ref
     model = AGBModel(float(a), float(b), float(c), float(min(sat, max_ref)), max_ref,
-                     [{"agb": d["agb"], "hv_db": float(10 * math.log10(d["hv"])), "n": d["n"]} for d in curve],
+                     curve,
                      {}, {}, {}, reference, in_range)
+    if model.dynamic_range_db < 1.0:
+        return None, [Note("biomass", WARN,
+                           f"NISAR HV changes by only {model.dynamic_range_db:.1f} dB across the reference biomass "
+                           "range here, too little to estimate biomass from it. The HV backscatter map and the "
+                           "forest-loss results are unaffected.")]
+    if b <= 5.5 or model.sat_agb < 25:
+        return None, [Note("biomass", WARN,
+                           f"The radar-biomass relation fitted here is not credible (it would saturate at "
+                           f"{model.sat_agb:.0f} Mg/ha), usually because the reference biomass map is very "
+                           "uncertain over this forest. Biomass is not estimated; the HV backscatter map and the "
+                           "forest-loss results are unaffected.")]
     pred_tr, _ = model.invert(from_db(hv_db[tr]))
     pred_te, _ = model.invert(from_db(hv_db[te]))
     model.train = _metrics(pred_tr, agb_ref[tr])
@@ -185,7 +206,8 @@ def fit_agb(hv_db: np.ndarray, agb_ref: np.ndarray, usable: np.ndarray, test: np
                           f"{tb['r']:.2f}, RMSE {tb['rmse']:.0f} Mg/ha ({tb['rel_rmse']:.0%})."))
     notes.append(Note("biomass", INFO,
                       "ESA CCI Biomass is itself partly made from L-band radar (ALOS-2 PALSAR-2), so this agreement "
-                      "is a consistency check, not fully independent validation; field plots (e.g. the Forest "
+                      "is a consistency check, not fully independent validation. Its own errors also lower the "
+                      "agreement, so a modest r does not by itself mean NISAR is wrong; field plots (e.g. the Forest "
                       "Survey of India inventory) are the real test."))
     return model, notes
 

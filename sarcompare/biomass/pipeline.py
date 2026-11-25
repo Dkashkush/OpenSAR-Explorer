@@ -379,6 +379,9 @@ class ForestPipeline:
         if model is not None:
             r.agb, r.saturated = model.invert(A.from_db(r.hv_now_db))
             f = r.forest & np.isfinite(r.agb)
+            fc = r.forest & np.isfinite(cci["agb"])
+            if fc.any():
+                r.stats["cci_agb_mean_forest"] = float(np.mean(cci["agb"][fc]))
             if f.any():
                 r.stats.update(forest_ha=float(f.sum() * r.grid.cell_ha), agb_mean_forest=float(np.mean(r.agb[f])),
                                agb_total_t=float(np.sum(r.agb[f]) * r.grid.cell_ha),
@@ -387,7 +390,9 @@ class ForestPipeline:
                                   f"Forest above-ground biomass now: {r.stats['agb_mean_forest']:.0f} Mg/ha on average "
                                   f"over {r.stats['forest_ha']:,.0f} ha of forest; {r.stats['saturated_share']:.0%} of "
                                   f"the forest is at or above the saturation level ({model.sat_agb:.0f} Mg/ha), so "
-                                  "the total is a lower bound there."))
+                                  "the total is a lower bound there"
+                                  + (f" (ESA CCI {cci['year']}: {r.stats['cci_agb_mean_forest']:.0f} Mg/ha over the "
+                                     "same forest)." if "cci_agb_mean_forest" in r.stats else ".")))
         self.emit("biomass", "Mapped forest biomass" if model else "Biomass could not be calibrated", notes)
 
     # ------------------------------------------------------------------ zones

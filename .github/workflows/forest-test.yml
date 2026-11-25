@@ -28,7 +28,7 @@ on:
         description: "NISAR images to use (spread over the period)"
         type: choice
         options: ["4", "6", "8", "12", "16"]
-        default: "8"
+        default: "12"
       direction:
         description: "Satellite pass"
         type: choice
