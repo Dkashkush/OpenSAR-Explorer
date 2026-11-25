@@ -122,7 +122,8 @@ def footer():
         f'<div class="app-footer">OpenSAR Explorer {__copyright__} An independent tool, not affiliated with NASA, ISRO, ESA, ASF or USGS. '
         "Data: NISAR (NASA/ISRO) and Copernicus Sentinel-1 (ESA) via the "
         '<a href="https://asf.alaska.edu" target="_blank">Alaska Satellite Facility</a>; GNSS from the '
-        '<a href="https://geodesy.unr.edu" target="_blank">Nevada Geodetic Laboratory</a>; base maps © '
+        '<a href="https://geodesy.unr.edu" target="_blank">Nevada Geodetic Laboratory</a>; forest maps from ESA '
+        "WorldCover and ESA CCI Biomass, and Hansen/UMD/Google/USGS/NASA (CC BY 4.0); base maps © "
         "OpenStreetMap contributors and Esri. Results are research estimates: verify before making decisions. "
         f"Version {code_version()}. "
         f'<a href="{REPO}/blob/HEAD/TERMS.md" target="_blank">Terms of use</a> · '

@@ -53,8 +53,8 @@ def plain_summary(r) -> list[tuple[str, str]]:
         out.append((WARN, f"{_n(len(unm), 'patch').capitalize()}, {st['unmapped_ha']:,.0f} ha, "
                           f"{'was' if len(unm) == 1 else 'were'} forest in 2021 but "
                           f"{'is' if len(unm) == 1 else 'are'} open land "
-                          "now and not in the global loss maps yet. They may have been cleared early in 2026: "
-                          "worth checking on recent satellite photos."))
+                          f"now and not in the global loss maps yet. {'It' if len(unm) == 1 else 'They'} may have "
+                          "been cleared early in 2026: worth checking on recent satellite photos."))
     yearly = (r.ref.get("hansen") or {}).get("yearly_ha") or {}
     recent = sum(v for y, v in yearly.items() if y >= cfg.recent_from)
     if recent:
