@@ -1,0 +1,47 @@
+# Copyright (c) 2026 Deepa Kumari. All rights reserved. See LICENSE.
+# Searches ASF for NISAR products over an area and prints one file's layout and values (read remotely).
+# Uses the EARTHDATA_TOKEN repository secret. Run it: Actions tab -> "Inspect NISAR products" -> Run workflow.
+
+name: Inspect NISAR products
+
+on:
+  workflow_dispatch:
+    inputs:
+      type:
+        description: "Product type (processing level)"
+        type: choice
+        options: [GCOV, GUNW, GSLC, RSLC, GOFF]
+        default: GCOV
+      bbox:
+        description: "Area 'west south east north'"
+        default: "82.55 22.70 82.85 22.95"
+      start:
+        description: "Start date YYYY-MM-DD (blank = any)"
+        default: "2026-06-01"
+      open:
+        description: "Files to open (newest first)"
+        default: "1"
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EARTHDATA_TOKEN: ${{ secrets.EARTHDATA_TOKEN }}
+      TYPE: ${{ inputs.type }}
+      BBOX: ${{ inputs.bbox }}
+      START: ${{ inputs.start }}
+      OPEN: ${{ inputs.open }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e .
+      - name: Inspect
+        run: |
+          for v in $BBOX; do case "$v" in *[!0-9.-]*) echo "::error::bbox must be four numbers"; exit 1;; esac; done
+          case "$OPEN" in ''|*[!0-9]*) echo "::error::open must be a number"; exit 1;; esac
+          case "$START" in ''|[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) echo "::error::start must be YYYY-MM-DD"; exit 1;; esac
+          python scripts/inspect_nisar.py --type "$TYPE" --bbox $BBOX ${START:+--start $START} --open "$OPEN"

@@ -7,6 +7,14 @@ name: Check data sources
 on:
   workflow_dispatch:
     inputs:
+      check:
+        description: "What to check"
+        type: choice
+        options: [licsar, forest]
+        default: licsar
+      bbox:
+        description: "forest: test area 'west south east north'"
+        default: "82.55 22.70 82.85 22.95"
       tracks:
         description: "Sentinel-1 tracks (relative orbits) to list in LiCSAR, separated by spaces"
         default: "28 35"
@@ -25,13 +33,21 @@ jobs:
       TRACKS: ${{ inputs.tracks }}
       FRAMES: ${{ inputs.frames }}
       POINT: ${{ inputs.point }}
+      CHECK: ${{ inputs.check }}
+      BBOX: ${{ inputs.bbox }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install requests
+      - run: pip install requests numpy rasterio
+      - name: Forest reference data
+        if: inputs.check == 'forest'
+        run: |
+          for v in $BBOX; do case "$v" in *[!0-9.-]*) echo "::error::bbox must be four numbers"; exit 1;; esac; done
+          python scripts/probe_forest_data.py --bbox $BBOX
       - name: Probe
+        if: inputs.check != 'forest'
         run: |
           case "$FRAMES" in ''|*[!0-9]*) echo "::error::frames must be a number"; exit 1;; esac
           for t in $TRACKS; do case "$t" in *[!0-9]*) echo "::error::tracks must be numbers"; exit 1;; esac; done
